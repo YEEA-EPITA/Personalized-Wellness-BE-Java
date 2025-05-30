@@ -1,32 +1,25 @@
 package fr.epita.yeea2.config;
 
 import fr.epita.yeea2.service.AppUserDetailsService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-import org.springframework.security.web.SecurityFilterChain;
-
+import fr.epita.yeea2.service.JwtService;
+import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
+@AllArgsConstructor
 public class SecurityConfig {
 
-    @Autowired
-    private AppUserDetailsService userDetailsService;
-
+//    private AppUserDetailsService userDetailsService;
+    private final JwtService jwtService;
 
 
 
@@ -35,32 +28,23 @@ public class SecurityConfig {
         return new GoogleAccessTokenAuthenticationProvider();
     }
 
-//    @Bean
-//    public AuthenticationManager authenticationManager(HttpSecurity http,
-//                                                       GoogleAccessTokenAuthenticationProvider provider) throws Exception {
-//        return http.getSharedObject(AuthenticationManagerBuilder.class)
-//                .authenticationProvider(provider)
-//                .build();
-//    }
-
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
-                                           AuthenticationManager authenticationManager) throws Exception {
-
-        GoogleAccessTokenAuthenticationFilter filter = new GoogleAccessTokenAuthenticationFilter(authenticationManager);
+                                           AuthenticationManager authManager) throws Exception {
 
         http
-                .csrf(csrf -> csrf.disable())
+                .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/**").authenticated()
                         .requestMatchers("/auth/**").permitAll()
-                        .anyRequest().permitAll()
+                        .anyRequest().authenticated()
                 )
-                .addFilterBefore(filter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(
+                        new GoogleAccessTokenAuthenticationFilter(authManager, jwtService),
+                        UsernamePasswordAuthenticationFilter.class
+                );
 
         return http.build();
     }
-
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -70,19 +54,21 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(
             HttpSecurity http,
             GoogleAccessTokenAuthenticationProvider googleProvider,
+            JwtAuthenticationProvider jwtProvider, // ADD THIS
             AppUserDetailsService userDetailsService,
             PasswordEncoder passwordEncoder) throws Exception {
 
         AuthenticationManagerBuilder auth = http.getSharedObject(AuthenticationManagerBuilder.class);
 
-        auth
-                .userDetailsService(userDetailsService)
+        auth.userDetailsService(userDetailsService)
                 .passwordEncoder(passwordEncoder);
 
         auth.authenticationProvider(googleProvider);
+        auth.authenticationProvider(jwtProvider); // 🔥 MUST be added
 
         return auth.build();
     }
+
 
 
 }
