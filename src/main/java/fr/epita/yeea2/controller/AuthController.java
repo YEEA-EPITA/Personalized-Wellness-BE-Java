@@ -1,11 +1,11 @@
 package fr.epita.yeea2.controller;
 
 import com.nimbusds.jwt.SignedJWT;
+import fr.epita.yeea2.dto.AuthRequest;
+import fr.epita.yeea2.dto.AuthResponse;
 import fr.epita.yeea2.entity.AppUser;
 import fr.epita.yeea2.repository.UserRepository;
 import fr.epita.yeea2.service.JwtService;
-import fr.epita.yeea2.dto.AuthRequest;
-import fr.epita.yeea2.dto.AuthResponse;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -14,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -40,6 +41,11 @@ public class AuthController {
             return "No authenticated user";
         }
         return "Hello, " + user.getUsername() + "! You are authenticated with roles: " + user.getAuthorities();
+    }
+
+    @GetMapping("/google/profile")
+    public String profile(@AuthenticationPrincipal OAuth2User user) {
+        return "Hello " + user.getAttribute("name") + ", email: " + user.getAttribute("email");
     }
 
     @GetMapping("/debug-alg")
