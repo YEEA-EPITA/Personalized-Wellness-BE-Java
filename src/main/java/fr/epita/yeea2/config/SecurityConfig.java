@@ -3,7 +3,7 @@ package fr.epita.yeea2.config;
 import fr.epita.yeea2.service.AppUserDetailsService;
 import fr.epita.yeea2.service.CustomOAuth2UserService;
 import fr.epita.yeea2.service.JwtService;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -16,13 +16,13 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class SecurityConfig {
 
 //    private AppUserDetailsService userDetailsService;
     private final JwtService jwtService;
-
-
+    private final CustomOAuth2UserService customOAuth2UserService;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
     @Bean
     public GoogleAccessTokenAuthenticationProvider googleAccessTokenAuthenticationProvider() {
@@ -32,9 +32,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
                                            AuthenticationManager authenticationManager,
-                                           CustomOAuth2UserService customOAuth2UserService,
                                            JwtService jwtService) throws Exception {
-
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
@@ -42,11 +40,12 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
-//                        .loginPage("/auth/login") // Optional: your own login page
+                        .loginPage("/auth/login") // <--- optional
                         .defaultSuccessUrl("/google/profile", true)
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService) // persists the user
                         )
+                        .successHandler(oAuth2SuccessHandler) // <-- inject here
                 )
                 .addFilterBefore(
                         new GoogleAccessTokenAuthenticationFilter(authenticationManager, jwtService),

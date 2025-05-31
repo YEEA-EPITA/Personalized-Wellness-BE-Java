@@ -1,8 +1,8 @@
 package fr.epita.yeea2.controller;
 
-import com.nimbusds.jwt.SignedJWT;
+import fr.epita.yeea2.dto.ApiResponse;
 import fr.epita.yeea2.dto.AuthRequest;
-import fr.epita.yeea2.dto.AuthResponse;
+import fr.epita.yeea2.dto.UserResponse;
 import fr.epita.yeea2.entity.AppUser;
 import fr.epita.yeea2.repository.UserRepository;
 import fr.epita.yeea2.service.JwtService;
@@ -13,6 +13,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
@@ -48,30 +49,21 @@ public class AuthController {
         return "Hello " + user.getAttribute("name") + ", email: " + user.getAttribute("email");
     }
 
-    @GetMapping("/debug-alg")
-    public ResponseEntity<String> debugJwtAlg(@RequestHeader("Authorization") String authHeader) {
-        try {
-            String token = authHeader.replace("Bearer ", "");
-            String alg = getJwtAlgorithm(token);
-            return ResponseEntity.ok("JWT alg = " + alg);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Invalid token");
-        }
-    }
-
     @PostMapping("/auth/login")
-    public ResponseEntity<?> login(@RequestBody AuthRequest request) {
+    public ResponseEntity<ApiResponse<UserResponse>> login(@RequestBody AuthRequest request) {
         Authentication authentication = authManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
 
         String jwt = jwtService.generateToken(authentication);
-        return ResponseEntity.ok(new AuthResponse(jwt));
-    }
 
-    private String getJwtAlgorithm(String token) throws Exception {
-        SignedJWT signedJWT = SignedJWT.parse(token);
-        return signedJWT.getHeader().getAlgorithm().getName();
+        AppUser user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        UserResponse userResponse = UserResponse.from(user, jwt);
+
+        ApiResponse<UserResponse> response = new ApiResponse<>(200, "Login successful", userResponse);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/auth/signup")
