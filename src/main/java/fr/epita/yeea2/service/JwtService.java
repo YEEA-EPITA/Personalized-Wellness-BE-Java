@@ -1,10 +1,13 @@
 package fr.epita.yeea2.service;
 
+import fr.epita.yeea2.entity.AppUser;
+import fr.epita.yeea2.repository.UserRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -20,6 +23,9 @@ public class JwtService {
 
     @Value("${jwt.secret}")
     private String secret;
+
+    @Autowired
+    private UserRepository userRepository;
 
     private Key key;
 
@@ -44,12 +50,13 @@ public class JwtService {
 
     public String generateToken(Authentication authentication) {
         String email;
+        String userId;
 
-        // Check for Google OAuth2 login
+        // Google login
         if (authentication.getPrincipal() instanceof OidcUser oidcUser) {
             email = oidcUser.getAttribute("email");
 
-            // Check for system login (UsernamePasswordAuthenticationToken or UserDetails)
+            // System login
         } else if (authentication.getPrincipal() instanceof UserDetails userDetails) {
             email = userDetails.getUsername();
 
@@ -57,10 +64,20 @@ public class JwtService {
             throw new IllegalArgumentException("Unsupported principal type: " + authentication.getPrincipal().getClass());
         }
 
+        // Get user ID from DB
+        AppUser user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        userId = user.getId();
+
+        // iat and exp
+        Date issuedAt = new Date();
+        Date expiration = new Date(issuedAt.getTime() + 3600 * 1000); // 1 hour
+
         return Jwts.builder()
-                .setSubject(email)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 86400000)) // 1 day
+                .claim("email", email)
+                .claim("id", userId)
+                .setIssuedAt(issuedAt)
+                .setExpiration(expiration)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
