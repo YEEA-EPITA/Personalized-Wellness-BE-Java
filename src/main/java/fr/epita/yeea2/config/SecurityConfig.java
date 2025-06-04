@@ -40,12 +40,11 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
-                        .loginPage("/auth/login") // <--- optional
                         .defaultSuccessUrl("/google/profile", true)
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService) // persists the user
                         )
-                        .successHandler(oAuth2SuccessHandler) // <-- inject here
+                        .successHandler(oAuth2SuccessHandler) // inject success handler for OAuth2
                 )
                 .addFilterBefore(
                         new GoogleAccessTokenAuthenticationFilter(authenticationManager, jwtService),
@@ -54,7 +53,6 @@ public class SecurityConfig {
 
         return http.build();
     }
-
 
 
     @Bean

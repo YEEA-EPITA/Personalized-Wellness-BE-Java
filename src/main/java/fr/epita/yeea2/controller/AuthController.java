@@ -7,6 +7,7 @@ import fr.epita.yeea2.entity.AppUser;
 import fr.epita.yeea2.repository.UserRepository;
 import fr.epita.yeea2.service.JwtService;
 import lombok.AllArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -17,6 +18,8 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.AuthenticationException;
+
 
 import java.util.List;
 
@@ -50,21 +53,29 @@ public class AuthController {
         return "Hello " + user.getAttribute("name") + ", email: " + user.getAttribute("email");
     }
 
+
     @PostMapping("/auth/login")
     public ResponseEntity<ApiResponse<UserResponse>> login(@RequestBody AuthRequest request) {
-        Authentication authentication = authManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
+        try {
+            Authentication authentication = authManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+            );
 
-        String jwt = jwtService.generateToken(authentication);
 
-        AppUser user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+            String jwt = jwtService.generateToken(authentication);
 
-        UserResponse userResponse = UserResponse.from(user, jwt);
+            AppUser user = userRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        ApiResponse<UserResponse> response = new ApiResponse<>(200, "Login successful", userResponse);
-        return ResponseEntity.ok(response);
+            UserResponse userResponse = UserResponse.from(user, jwt);
+
+            ApiResponse<UserResponse> response = new ApiResponse<>(200, "Login successful", userResponse);
+            return ResponseEntity.ok(response);
+        } catch (AuthenticationException ex) {
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse<>(401, "Invalid email or password", null));
+        }
     }
 
     @PostMapping("/auth/signup")
