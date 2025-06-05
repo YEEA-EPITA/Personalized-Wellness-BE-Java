@@ -73,6 +73,7 @@ public class SecurityConfig {
         auth.userDetailsService(userDetailsService)
                 .passwordEncoder(passwordEncoder);
 
+
         auth.authenticationProvider(googleProvider);
         auth.authenticationProvider(jwtProvider); // 🔥 MUST be added
 
