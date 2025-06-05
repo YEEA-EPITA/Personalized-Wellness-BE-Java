@@ -50,6 +50,7 @@ public class AuthController {
 
     @GetMapping("/google/profile")
     public String profile(@AuthenticationPrincipal OAuth2User user) {
+
         return "Hello " + user.getAttribute("name") + ", email: " + user.getAttribute("email");
     }
 
@@ -79,9 +80,11 @@ public class AuthController {
     }
 
     @PostMapping("/auth/signup")
-    public ResponseEntity<?> signup(@RequestBody AuthRequest request) {
+    public ResponseEntity<ApiResponse<UserResponse>> signup(@RequestBody AuthRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            return ResponseEntity.badRequest().body("Email already exists");
+            return ResponseEntity
+                    .badRequest()
+                    .body(new ApiResponse<>(400, "Email already exists", null));
         }
 
         AppUser newUser = new AppUser();
@@ -90,7 +93,17 @@ public class AuthController {
         newUser.setRoles(List.of("ROLE_USER")); // default role
 
         userRepository.save(newUser);
-        return ResponseEntity.ok("Account created successfully");
+
+        // Optional: generate token after signup
+        Authentication authentication = authManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+        );
+        String jwt = jwtService.generateToken(authentication);
+
+        UserResponse userResponse = UserResponse.from(newUser, jwt);
+        ApiResponse<UserResponse> response = new ApiResponse<>(200, "Account created successfully", userResponse);
+
+        return ResponseEntity.ok(response);
     }
 
 }

@@ -6,66 +6,67 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter;
-import org.springframework.util.AntPathMatcher;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-public class GoogleAccessTokenAuthenticationFilter extends AbstractAuthenticationProcessingFilter {
+public class GoogleAccessTokenAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final AuthenticationManager authenticationManager;
 
     public GoogleAccessTokenAuthenticationFilter(AuthenticationManager authenticationManager,
                                                  JwtService jwtService) {
-        super(request -> new AntPathMatcher().match("/api/**", request.getRequestURI()));
-        setAuthenticationManager(authenticationManager);
+        this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
     }
 
     @Override
-    public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response)
-            throws AuthenticationException, IOException, ServletException {
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+        String path = request.getRequestURI();
+        if (!path.startsWith("/auth/google")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new BadCredentialsException("Missing or invalid Authorization header");
+            filterChain.doFilter(request, response);
+            return;
         }
 
         String token = authHeader.substring(7);
+        try {
+            Authentication authResult;
 
-        if (isGoogleToken(token)) {
-            // Treat it as a Google access token
-            Authentication authRequest = new GoogleAccessTokenAuthenticationToken(token);
-            return getAuthenticationManager().authenticate(authRequest);
+            if (isGoogleToken(token)) {
+                authResult = authenticationManager.authenticate(
+                        new GoogleAccessTokenAuthenticationToken(token));
+            } else {
+                String username = jwtService.extractUsername(token);
+                authResult = authenticationManager.authenticate(
+                        new UsernamePasswordAuthenticationToken(username, null));
+            }
 
-        } else {
-            // Treat it as a system-generated JWT
-            String username = jwtService.extractUsername(token);
+            SecurityContextHolder.getContext().setAuthentication(authResult);
 
-            // Typically no password in JWT-based login, so pass null or a dummy password
-            Authentication authRequest = new UsernamePasswordAuthenticationToken(username, null);
-
-            return getAuthenticationManager().authenticate(authRequest);
+        } catch (AuthenticationException ex) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("Unauthorized: " + ex.getMessage());
+            return;
         }
-    }
 
-
-    @Override
-    protected void successfulAuthentication(HttpServletRequest request,
-                                            HttpServletResponse response,
-                                            FilterChain chain,
-                                            Authentication authResult) throws IOException, ServletException {
-        SecurityContextHolder.getContext().setAuthentication(authResult);
-        chain.doFilter(request, response);
+        filterChain.doFilter(request, response);
     }
 
     private boolean isGoogleToken(String token) {
-        // Simple check: Google access tokens are usually opaque strings (not JWT format)
+        // Google tokens are opaque (not JWT), no dots
         return !token.contains(".");
     }
 }
