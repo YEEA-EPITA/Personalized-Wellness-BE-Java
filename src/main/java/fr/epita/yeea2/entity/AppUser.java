@@ -16,7 +16,8 @@ public class AppUser {
     @Id
     private String id;
     private String email;
-    private String name;
+    private String firstName;
+    private String lastName;
     private String password; // hashed!
     private List<String> roles;
     private String provider;

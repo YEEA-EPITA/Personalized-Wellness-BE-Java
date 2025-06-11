@@ -30,7 +30,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         userRepository.findByEmail(email).orElseGet(() -> {
             AppUser newUser = AppUser.builder()
                     .email(email)
-                    .name(name)
+                    .firstName(name)
                     .provider("google")
                     .build();
             return userRepository.save(newUser);

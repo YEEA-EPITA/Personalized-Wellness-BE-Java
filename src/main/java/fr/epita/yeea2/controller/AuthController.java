@@ -89,6 +89,8 @@ public class AuthController {
 
         AppUser newUser = new AppUser();
         newUser.setEmail(request.getEmail());
+        newUser.setFirstName(request.getFirstName());
+        newUser.setLastName(request.getLastName());
         newUser.setPassword(passwordEncoder.encode(request.getPassword()));
         newUser.setRoles(List.of("ROLE_USER")); // default role
 
