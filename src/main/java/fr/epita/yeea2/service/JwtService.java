@@ -130,5 +130,8 @@ public class JwtService {
         return claimsResolver.apply(claims);
     }
 
+    public String extractUserId(String token) {
+        return extractAllClaims(token).get("id").toString();
+    }
 
 }

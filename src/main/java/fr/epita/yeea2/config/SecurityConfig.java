@@ -39,6 +39,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/auth/**", "/oauth2/**") .permitAll()
+                        .requestMatchers("/jira/login", "/jira/callback").permitAll() // todo - delete after integrating with FE
+                        .requestMatchers("/jira/**").authenticated()  // secure the rest of /jira/**
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
