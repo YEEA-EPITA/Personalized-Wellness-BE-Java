@@ -17,9 +17,11 @@ public class PlatformCredential {
     private String id;
     private String type;      // e.g. GOOGLE, JIRA, GITHUB
     private String name;      // Full name (if applicable)
-    private String email;     // Optional (not all platforms use email)
-
-    private Token tokens;
+    private String userEmail;     // Optional (not all platforms use email)
+    private String platformEmail;
+    private String platformUserId;
+    private Token platformToken;
+    private String platformCloudId;
 
     private String connectorId; // Optional reference to integration connector
 

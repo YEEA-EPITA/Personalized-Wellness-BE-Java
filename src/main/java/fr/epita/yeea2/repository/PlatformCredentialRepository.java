@@ -9,5 +9,5 @@ import java.util.Optional;
 @Repository
 public interface PlatformCredentialRepository extends MongoRepository<PlatformCredential, String> {
 
-    Optional<PlatformCredential> findByEmailAndType(String email, String type);
+    Optional<PlatformCredential> findByPlatformEmailAndType(String email, String type);
 }

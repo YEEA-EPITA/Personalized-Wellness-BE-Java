@@ -40,7 +40,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/auth/**", "/oauth2/**") .permitAll()
                         .requestMatchers("/jira/login", "/jira/callback").permitAll() // todo - delete after integrating with FE
-                        .requestMatchers("/jira/**").authenticated()  // secure the rest of /jira/**
+//                        .requestMatchers("/jira/projects").permitAll() // for testing
+//                        .requestMatchers("/jira/**").authenticated()  // secure the rest of /jira/**
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
@@ -51,13 +52,14 @@ public class SecurityConfig {
                         .successHandler(oAuth2SuccessHandler) // inject success handler for OAuth2
                 )
                 .addFilterBefore(
-                        new GoogleAccessTokenAuthenticationFilter(authenticationManager, jwtService),
+                        new JwtAuthenticationFilter(jwtService, userDetailsService),
                         UsernamePasswordAuthenticationFilter.class
                 )
                 .addFilterBefore(
-                        new JwtAuthenticationFilter(jwtService, userDetailsService),
+                        new GoogleAccessTokenAuthenticationFilter(authenticationManager, jwtService),
                         UsernamePasswordAuthenticationFilter.class
                 );
+
 
 
         return http.build();
