@@ -6,6 +6,7 @@ import fr.epita.yeea2.service.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -36,6 +37,7 @@ public class SecurityConfig {
                                            AuthenticationManager authenticationManager,
                                            JwtService jwtService) throws Exception {
         http
+
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/auth/**", "/oauth2/**") .permitAll()
@@ -50,6 +52,11 @@ public class SecurityConfig {
                                 .userService(customOAuth2UserService) // persists the user
                         )
                         .successHandler(oAuth2SuccessHandler) // inject success handler for OAuth2
+                        .failureHandler((request, response, exception) -> {
+                            // Handle OAuth2 login failure
+                            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+                            response.getWriter().write("Login failed: " + exception.getMessage());
+                        })
                 )
                 .addFilterBefore(
                         new JwtAuthenticationFilter(jwtService, userDetailsService),
@@ -58,7 +65,12 @@ public class SecurityConfig {
                 .addFilterBefore(
                         new GoogleAccessTokenAuthenticationFilter(authenticationManager, jwtService),
                         UsernamePasswordAuthenticationFilter.class
-                );
+                )
+                .exceptionHandling()
+                // Customize the authentication entry point
+                .authenticationEntryPoint(new CustomAuthenticationEntryPoint()) // Sends 401 Unauthorized for any unauthenticated request
+        ;
+        ;
 
 
 

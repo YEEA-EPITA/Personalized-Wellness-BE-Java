@@ -5,6 +5,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -42,6 +43,12 @@ public class GoogleAccessTokenAuthenticationFilter extends OncePerRequestFilter 
         }
 
         String token = authHeader.substring(7);
+
+        if (token == null || jwtService.isTokenExpired(token)) {
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            response.getWriter().write("JWT token expired or invalid");
+            return;
+        }
         try {
             Authentication authResult;
 
