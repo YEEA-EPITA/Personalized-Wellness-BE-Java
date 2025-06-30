@@ -25,6 +25,9 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secret;
 
+    @Value("${jwt.refresh_token_expiry}")
+    private String refreshExpiryTime;
+
     @Autowired
     private UserRepository userRepository;
 
@@ -37,17 +40,6 @@ public class JwtService {
         this.key = Keys.hmacShaKeyFor(secret.getBytes());
     }
 
-//    public String generateToken(Authentication authentication) {
-//        User user = (User) authentication.getPrincipal();
-//
-//        return Jwts.builder()
-//                .setSubject(user.getUsername())
-//                .claim("roles", user.getAuthorities())
-//                .setIssuedAt(new Date())
-//                .setExpiration(new Date(System.currentTimeMillis() + expirationMillis))
-//                .signWith(key, SignatureAlgorithm.HS256)
-//                .compact();
-//    }
 
     public String generateToken(Authentication authentication) {
         String email;
@@ -83,14 +75,16 @@ public class JwtService {
                 .compact();
     }
 
-    public String getUsernameFromToken(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-        return claims.getSubject();
+
+    public String generateRefreshToken(UserDetails userDetails) {
+        return Jwts.builder()
+                .setSubject(userDetails.getUsername())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + refreshExpiryTime  )) // e.g. 7 days
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
     }
+
 
     public String extractUsername(String token) {
         return extractAllClaims(token).get("email").toString();

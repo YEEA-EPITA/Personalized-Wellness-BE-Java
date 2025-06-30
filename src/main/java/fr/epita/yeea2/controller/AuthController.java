@@ -5,23 +5,26 @@ import fr.epita.yeea2.dto.AuthRequest;
 import fr.epita.yeea2.dto.UserResponse;
 import fr.epita.yeea2.entity.AppUser;
 import fr.epita.yeea2.repository.UserRepository;
+import fr.epita.yeea2.service.AppUserDetailsService;
 import fr.epita.yeea2.service.JwtService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.security.core.AuthenticationException;
-
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping
@@ -33,6 +36,7 @@ public class AuthController {
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AppUserDetailsService appUserDetailsService;
 
 
     @GetMapping("/")
@@ -61,8 +65,6 @@ public class AuthController {
             Authentication authentication = authManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
             );
-
-
             String jwt = jwtService.generateToken(authentication);
 
             AppUser user = userRepository.findByEmail(request.getEmail())
@@ -78,6 +80,32 @@ public class AuthController {
                     .body(new ApiResponse<>(401, "Invalid email or password", null));
         }
     }
+
+    @PostMapping("/auth/refresh-token")
+    public ResponseEntity<?> refreshToken(HttpServletRequest request) {
+        final String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing refresh token");
+        }
+
+        String refreshToken = authHeader.substring(7);
+        String username = jwtService.extractUsername(refreshToken);
+
+        if (username != null) {
+            UserDetails user = appUserDetailsService.loadUserByUsername(username);
+            if (jwtService.isTokenValid(refreshToken, user)) {
+                // 🔁 Wrap user in an Authentication object
+                Authentication authentication = new UsernamePasswordAuthenticationToken(
+                        user, null, user.getAuthorities());
+
+                String newAccessToken = jwtService.generateToken(authentication);
+                return ResponseEntity.ok(Map.of("accessToken", newAccessToken));
+            }
+        }
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Invalid refresh token");
+    }
+
 
     @PostMapping("/auth/signup")
     public ResponseEntity<ApiResponse<UserResponse>> signup(@RequestBody AuthRequest request) {

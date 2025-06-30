@@ -1,14 +1,12 @@
 package fr.epita.yeea2.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import fr.epita.yeea2.dto.ApiResponse;
-import fr.epita.yeea2.dto.UserResponse;
 import fr.epita.yeea2.entity.AppUser;
 import fr.epita.yeea2.repository.UserRepository;
 import fr.epita.yeea2.service.JwtService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -24,6 +22,9 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Value("${google.googleRedirectUrl}")
+    private String googleRedirectUrl;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -42,16 +43,12 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         // Generate JWT
         String token = jwtService.generateToken(authentication);
 
-        // Create UserResponse
-        UserResponse userResponse = UserResponse.from(user, token);
+        // Optional: add user info (if needed)
+        // String name = oidcUser.getAttribute("name");
 
-        // Create standardized API response
-        ApiResponse<UserResponse> apiResponse = new ApiResponse<>(200, "Login successful", userResponse);
-
-        // Write as JSON
-        response.setContentType("application/json");
-        response.setCharacterEncoding("UTF-8");
-        new ObjectMapper().writeValue(response.getWriter(), apiResponse);
+        // Redirect to frontend with token
+        String redirectUrl = googleRedirectUrl + token;
+        response.sendRedirect(redirectUrl);
     }
 
 }
