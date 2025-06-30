@@ -53,9 +53,26 @@ public class AuthController {
     }
 
     @GetMapping("/google/profile")
-    public String profile(@AuthenticationPrincipal OAuth2User user) {
+    public ResponseEntity<ApiResponse<Map<String, String>>> profile(@AuthenticationPrincipal OAuth2User user) {
 
-        return "Hello " + user.getAttribute("name") + ", email: " + user.getAttribute("email");
+        // Get user details from the OAuth2User object
+        Map<String, Object> attributes = user.getAttributes();
+        String firstName = (String) attributes.get("given_name");
+        String lastName = (String) attributes.get("family_name");
+        String email = (String) attributes.get("email");
+        String id = userRepository.findByEmail(email).orElseThrow().getId(); // Assuming "sub" is the unique ID from Google
+
+        // Create response data
+        Map<String, String> response = Map.of(
+                "firstName", firstName != null ? firstName : "",
+                "lastName", lastName != null ? lastName : "",
+                "access_token", "",
+                "id", id,
+                "email", email != null ? email : ""
+        );
+        ApiResponse<Map<String, String>> apiResponse = new ApiResponse<>(200, "Login successful", response);
+
+        return ResponseEntity.ok(apiResponse);
     }
 
 
