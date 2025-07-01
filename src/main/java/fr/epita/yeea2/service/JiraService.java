@@ -2,10 +2,14 @@ package fr.epita.yeea2.service;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
-import fr.epita.yeea2.dto.JiraIssueRequest;
+import fr.epita.yeea2.constant.JiraConstant;
+import fr.epita.yeea2.constant.PlatformConstant;
+import fr.epita.yeea2.dto.JiraIssueCreateRequest;
+import fr.epita.yeea2.dto.JiraIssueGetRequest;
 import fr.epita.yeea2.dto.JiraTaskResponse;
 import fr.epita.yeea2.entity.PlatformCredential;
 import fr.epita.yeea2.repository.PlatformCredentialRepository;
+import fr.epita.yeea2.util.DateUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -46,7 +50,7 @@ public class JiraService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public String createIssue(JiraIssueRequest request) {
+    public String createIssue(JiraIssueCreateRequest request) {
         //TODO
         // temporary authenticate with email
         String email = "gianglibra1710@gmail.com";
@@ -57,7 +61,7 @@ public class JiraService {
         headers.setContentType(MediaType.APPLICATION_JSON);
 //        headers.setBearerAuth(jwtToken); // Or set header manually: "Authorization", "Bearer " + token
         headers.set("Authorization", "Basic " + encodedAuth);
-        HttpEntity<JiraIssueRequest> entity = new HttpEntity<>(request, headers);
+        HttpEntity<JiraIssueCreateRequest> entity = new HttpEntity<>(request, headers);
 
         ResponseEntity<String> response = restTemplate.exchange(
                 jiraBaseUrl + "/rest/api/3/issue",
@@ -76,7 +80,7 @@ public class JiraService {
 //            String email = jwt.getClaim("email"); // or "https://id.atlassian.com/systemAccountEmail"
 //            System.out.println("✅ Email from JWT: " + email);
 
-            PlatformCredential credential = platformCredentialRepository.findByPlatformEmailAndType(jiraEmai, "JIRA").orElse(null);
+            PlatformCredential credential = platformCredentialRepository.findByPlatformEmailAndType(jiraEmai, PlatformConstant.JIRA).orElse(null);
             if (credential != null) {
                 RestTemplate restTemplate = new RestTemplate();
 
@@ -216,13 +220,13 @@ public class JiraService {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .build();
-        PlatformCredential savedCredential = platformCredentialRepository.findByPlatformEmailAndType(jiraEmail, "JIRA").map(existing -> {
+        PlatformCredential savedCredential = platformCredentialRepository.findByPlatformEmailAndType(jiraEmail, PlatformConstant.JIRA).map(existing -> {
             existing.setPlatformToken(token);
             existing.setUpdatedAt(Instant.now());
             return platformCredentialRepository.save(existing);
         }).orElseGet(() -> {
             PlatformCredential newCredential = PlatformCredential.builder()
-                    .type("JIRA")
+                    .type(PlatformConstant.JIRA)
                     .userEmail(userEmail)
                     .name(null) // set Jira name if available
                     .platformToken(token)
@@ -237,44 +241,72 @@ public class JiraService {
         return savedCredential;
     }
 
-    public List<JiraTaskResponse> getTaskDetailsFromProject(String jiraEmail, String projectKey) {
-        PlatformCredential credential = platformCredentialRepository.findByPlatformEmailAndType(jiraEmail, "JIRA").orElse(null);
-        if (credential != null) {
-            RestTemplate restTemplate = new RestTemplate();
+    public List<JiraTaskResponse> getTaskDetailsFromProject(JiraIssueGetRequest request) {
+        try {
+            PlatformCredential credential = platformCredentialRepository.findByPlatformEmailAndType(request.getJiraEmail(), PlatformConstant.JIRA).orElse(null);
+            if (credential != null) {
+                RestTemplate restTemplate = new RestTemplate();
 
-            // Step 1: Get Cloud ID
-            HttpHeaders headers = new HttpHeaders();
-            headers.setBearerAuth(credential.getPlatformToken().getAccessToken());
-            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-            HttpEntity<Void> entity = new HttpEntity<>(headers);
+                // Step 1: Get Cloud ID
+                HttpHeaders headers = new HttpHeaders();
+                headers.setBearerAuth(credential.getPlatformToken().getAccessToken());
+                headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+                HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-            String cloudId = credential.getPlatformCloudId();
+                String cloudId = credential.getPlatformCloudId();
 
-            if (cloudId == null || cloudId.isEmpty()) {
-                throw new RuntimeException("No accessible resources found.");
+                if (cloudId == null || cloudId.isEmpty()) {
+                    throw new RuntimeException("No accessible resources found.");
+                }
+
+                String startDateStr = DateUtils.formatDate(request.getStartDate());
+                String endDateStr = DateUtils.formatDate(request.getEndDate());
+
+                // Step 2: Get issues for the specified projects
+                String url = this.buildSearchUrl(cloudId, request.getJiraProjects(),startDateStr,endDateStr);
+
+                ResponseEntity<Map> response = restTemplate.exchange(
+                        url,
+                        HttpMethod.GET,
+                        entity,
+                        Map.class
+                );
+
+                List<Map<String, Object>> rawIssues = (List<Map<String, Object>>) response.getBody().get("issues");
+
+                return rawIssues.stream()
+                        .map(this::simplifyTask)
+                        .collect(Collectors.toList());
             }
-
-            // Step 2: Get issues for the specified project
-            String url = String.format(
-                    "https://api.atlassian.com/ex/jira/%s/rest/api/3/search?jql=project=%s+AND+issuetype=Task",
-                    cloudId,
-                    projectKey
-            );
-
-            ResponseEntity<Map> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    entity,
-                    Map.class
-            );
-
-            List<Map<String, Object>> rawIssues = (List<Map<String, Object>>) response.getBody().get("issues");
-
-            return rawIssues.stream()
-                    .map(this::simplifyTask)
-                    .collect(Collectors.toList());
+            return Collections.emptyList();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return Collections.emptyList();
+    }
+
+    private String buildSearchUrl(String cloudId, List<String> projectKeys, String startDateStr, String endDateStr) {
+        String joinedKeys = projectKeys.stream()
+                .map(key -> "\"" + key + "\"") // quote each key for safety
+                .collect(Collectors.joining(", "));
+
+
+        String safeKey = joinedKeys.replace("%", "\\%");
+
+        String jql = String.format("project+IN+(%s)+AND+issuetype=%s+AND+((duedate>=%s+AND+duedate<=%s)+OR+(duedate+IS+EMPTY+AND+status!=%s))",
+                safeKey,
+                JiraConstant.IssueType.Task,
+                startDateStr,
+                endDateStr,
+                JiraConstant.IssueStatus.Done);
+
+//        String encodedJql = URLEncoder.encode(jql, StandardCharsets.UTF_8);
+
+        return String.format(
+                "https://api.atlassian.com/ex/jira/%s/rest/api/3/search?jql=%s",
+                cloudId,
+                jql
+        );
     }
 
     private JiraTaskResponse simplifyTask(Map<String, Object> issue) {
@@ -293,7 +325,7 @@ public class JiraService {
     }
     private PlatformCredential getJiraCredential(String jiraEmail) {
         return platformCredentialRepository
-                .findByPlatformEmailAndType(jiraEmail, "JIRA")
+                .findByPlatformEmailAndType(jiraEmail, PlatformConstant.JIRA)
                 .orElse(null);
     }
 
@@ -311,11 +343,27 @@ public class JiraService {
         headers.setBearerAuth(credential.getPlatformToken().getAccessToken());
         headers.setContentType(MediaType.APPLICATION_JSON);
 
+        Map<String, Object> descriptionContent = Map.of(
+                "type", "doc",
+                "version", 1,
+                "content", List.of(
+                        Map.of(
+                                "type", "paragraph",
+                                "content", List.of(
+                                        Map.of(
+                                                "type", "text",
+                                                "text", description
+                                        )
+                                )
+                        )
+                )
+        );
+
         Map<String, Object> fields = Map.of(
                 "fields", Map.of(
                         "project", Map.of("key", projectKey),
                         "summary", summary,
-                        "description", description,
+                        "description", descriptionContent,
                         "issuetype", Map.of("name", "Task")
                 )
         );
@@ -326,6 +374,7 @@ public class JiraService {
         ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
         return response.getBody();
     }
+
     public void updateJiraTask(String jiraEmail, String issueKey, String newSummary, String newDescription) {
         PlatformCredential credential = getJiraCredential(jiraEmail);
         if (credential == null) return;

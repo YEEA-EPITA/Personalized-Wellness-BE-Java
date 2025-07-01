@@ -36,7 +36,7 @@ public class JiraController {
     }
 
     @PostMapping("/create")
-    public String createJiraIssue(@RequestBody JiraIssueRequest request) {
+    public String createJiraIssue(@RequestBody JiraIssueCreateRequest request) {
         return jiraService.createIssue(request);
     }
 
@@ -86,7 +86,7 @@ public class JiraController {
         String authUrl = "https://auth.atlassian.com/authorize" +
                 "?audience=api.atlassian.com" +
                 "&client_id=" + clientId +
-                "&scope=read:me%20read:jira-user%20read:jira-work%20delete:jira-work%20offline_access&"+
+                "&scope=read:me%20read:jira-user%20read:jira-work%20write:jira-work%20delete:jira-work%20offline_access&"+
                 "&redirect_uri=" + redirectUri +
                 "&response_type=code" +
                 "&prompt=consent" +
@@ -118,16 +118,13 @@ public class JiraController {
     }
 
     @PostMapping("/tasks")
-    public ResponseEntity<?> getTasksByProject(@RequestBody Map<String, String> body) {
-        String jiraEmail = body.get("jiraEmail");
-        String projectKey = body.get("projectKey");
+    public ResponseEntity<?> getTasksByProject(@RequestBody JiraIssueGetRequest request) {
 
-        if (jiraEmail == null || projectKey == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "jiraEmail and projectKey are required."));
+        if (request.getJiraEmail() == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "jiraEmail is required."));
         }
-
         try {
-            List<JiraTaskResponse> tasks = jiraService.getTaskDetailsFromProject(jiraEmail, projectKey);
+            List<JiraTaskResponse> tasks = jiraService.getTaskDetailsFromProject(request);
             ApiResponse<List<JiraTaskResponse>> response = new ApiResponse<>(HttpStatus.OK.value(),"Retrieve tasks successfully", tasks);
             return ResponseEntity.ok(response);
         } catch (Exception e) {

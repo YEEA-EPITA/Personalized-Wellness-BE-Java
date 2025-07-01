@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class JiraIssueRequest {
+public class JiraIssueCreateRequest {
     private Fields fields;
 
     @Data
