@@ -35,41 +35,6 @@ public class JiraController {
 
     }
 
-    @PostMapping("/create")
-    public String createJiraIssue(@RequestBody JiraIssueCreateRequest request) {
-        return jiraService.createIssue(request);
-    }
-
-    // Optional: Test endpoint with hardcoded values
-//    @GetMapping("/create-sample")
-//    public String createSampleJiraIssue() {
-//        JiraIssueRequest.Fields.Project project = new JiraIssueRequest.Fields.Project("PROJKEY");
-//        JiraIssueRequest.Fields.IssueType issueType = new JiraIssueRequest.Fields.IssueType("Task");
-//
-//        JiraIssueRequest.Fields fields = new JiraIssueRequest.Fields(
-//                project,
-//                "Test Summary",
-//                "Test Description",
-//                issueType
-//        );
-//
-//        JiraIssueRequest request = new JiraIssueRequest(fields);
-//        return jiraService.createIssue(request);
-//    }
-
-//    @GetMapping("/login")
-//    public void redirectToJira(HttpServletResponse response) throws IOException, IOException {
-//        String redirectUri = "http://localhost:8080/jira/callback";
-//        String authUrl = "https://auth.atlassian.com/authorize" +
-//                "?audience=api.atlassian.com" +
-//                "&client_id=" + clientId +
-//                "&scope=read%3Ajira-user%20read%3Ajira-work" +
-//                "&redirect_uri=" + redirectUri +
-//                "&response_type=code" +
-//                "&prompt=consent";
-//        response.sendRedirect(authUrl);
-//    }
-
     @GetMapping("/login")
     public void redirectToJira(
             @RequestHeader("Authorization") String authHeader,
@@ -134,14 +99,9 @@ public class JiraController {
     }
 
     @PostMapping("/task/create")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> createTask(@RequestBody CreateJiraTaskRequest request) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createTask(@RequestBody JiraCreateTaskRequest request) {
         try {
-            Map<String, Object> createdTask = jiraService.createJiraTask(
-                    request.getJiraEmail(),
-                    request.getProjectKey(),
-                    request.getSummary(),
-                    request.getDescription()
-            );
+            Map<String, Object> createdTask = jiraService.createJiraTask(request);
             ApiResponse<Map<String, Object>> response = new ApiResponse<>(200, "Task created successfully", createdTask);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -151,13 +111,10 @@ public class JiraController {
     }
 
     @PutMapping("/task/update")
-    public ResponseEntity<ApiResponse<String>> updateTask(@RequestBody UpdateJiraTaskRequest request) {
+    public ResponseEntity<ApiResponse<String>> updateTask(@RequestBody JiraUpdateTaskRequest request) {
         try {
             jiraService.updateJiraTask(
-                    request.getJiraEmail(),
-                    request.getIssueKey(),
-                    request.getSummary(),
-                    request.getDescription()
+                    request
             );
             ApiResponse<String> response = new ApiResponse<>(200, "Task updated successfully", null);
             return ResponseEntity.ok(response);

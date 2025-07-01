@@ -4,9 +4,10 @@ import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import fr.epita.yeea2.constant.JiraConstant;
 import fr.epita.yeea2.constant.PlatformConstant;
-import fr.epita.yeea2.dto.JiraIssueCreateRequest;
+import fr.epita.yeea2.dto.JiraCreateTaskRequest;
 import fr.epita.yeea2.dto.JiraIssueGetRequest;
 import fr.epita.yeea2.dto.JiraTaskResponse;
+import fr.epita.yeea2.dto.JiraUpdateTaskRequest;
 import fr.epita.yeea2.entity.PlatformCredential;
 import fr.epita.yeea2.repository.PlatformCredentialRepository;
 import fr.epita.yeea2.util.DateUtils;
@@ -50,36 +51,23 @@ public class JiraService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public String createIssue(JiraIssueCreateRequest request) {
-        //TODO
-        // temporary authenticate with email
-        String email = "gianglibra1710@gmail.com";
-        String auth = email + ":" + jwtToken;
-        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+    private static final String DOC_TYPE = "doc";
+    private static final int DOC_VERSION = 1;
+    private static final String PARAGRAPH_TYPE = "paragraph";
+    private static final String TEXT_TYPE = "text";
+    private static final String FIELD_TYPE = "type";
+    private static final String FIELD_VERSION = "version";
+    private static final String FIELD_CONTENT = "content";
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-//        headers.setBearerAuth(jwtToken); // Or set header manually: "Authorization", "Bearer " + token
-        headers.set("Authorization", "Basic " + encodedAuth);
-        HttpEntity<JiraIssueCreateRequest> entity = new HttpEntity<>(request, headers);
+    private static final MediaType DEFAULT_MEDIA_TYPE = MediaType.APPLICATION_JSON;
+    private static final String URL_TEMPLATE_CREATE = "https://api.atlassian.com/ex/jira/%s/rest/api/3/issue";
 
-        ResponseEntity<String> response = restTemplate.exchange(
-                jiraBaseUrl + "/rest/api/3/issue",
-                HttpMethod.POST,
-                entity,
-                String.class
-        );
+    // URL templates
+    private static final String ISSUE_UPDATE_URL_TEMPLATE = "https://api.atlassian.com/ex/jira/%s/rest/api/3/issue/%s";
 
-        return response.getBody();
-    }
+
 
     public List<Map<String, Object>> getProjects(String jiraEmai) {
-//        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-//
-//        if (authentication != null && authentication.getPrincipal().get) {
-//            String email = jwt.getClaim("email"); // or "https://id.atlassian.com/systemAccountEmail"
-//            System.out.println("✅ Email from JWT: " + email);
-
             PlatformCredential credential = platformCredentialRepository.findByPlatformEmailAndType(jiraEmai, PlatformConstant.JIRA).orElse(null);
             if (credential != null) {
                 RestTemplate restTemplate = new RestTemplate();
@@ -295,10 +283,10 @@ public class JiraService {
 
         String jql = String.format("project+IN+(%s)+AND+issuetype=%s+AND+((duedate>=%s+AND+duedate<=%s)+OR+(duedate+IS+EMPTY+AND+status!=%s))",
                 safeKey,
-                JiraConstant.IssueType.Task,
+                fr.epita.yeea2.constant.JiraConstant.IssueType.Task,
                 startDateStr,
                 endDateStr,
-                JiraConstant.IssueStatus.Done);
+                fr.epita.yeea2.constant.JiraConstant.IssueStatus.Done);
 
 //        String encodedJql = URLEncoder.encode(jql, StandardCharsets.UTF_8);
 
@@ -310,93 +298,122 @@ public class JiraService {
     }
 
     private JiraTaskResponse simplifyTask(Map<String, Object> issue) {
-        Map<String, Object> fields = (Map<String, Object>) issue.get("fields");
+        Map<String, Object> fields = (Map<String, Object>) issue.get(JiraConstant.JiraField.FIELDS);
 
-        String summary = (String) fields.get("summary");
-        String dueDate = (String) fields.get("duedate");
-        String createdAt = (String) fields.get("created");
-        String updatedAt = (String) fields.get("updated");
-        String issueKey = (String) issue.get("key");
+        String summary = (String) fields.get(fr.epita.yeea2.constant.JiraConstant.JiraField.SUMMARY);
+        String dueDate = (String) fields.get(fr.epita.yeea2.constant.JiraConstant.JiraField.DUEDATE);
+        String createdAt = (String) fields.get(fr.epita.yeea2.constant.JiraConstant.JiraField.CREATED);
+        String updatedAt = (String) fields.get(fr.epita.yeea2.constant.JiraConstant.JiraField.UPDATED);
+        String issueKey = (String) issue.get(fr.epita.yeea2.constant.JiraConstant.JiraField.KEY);
+        Map<String, Object> creator = (Map<String, Object>) fields.get(JiraConstant.JiraField.CREATOR);
+        String createdBy = creator != null ? (String) creator.get(JiraConstant.JiraField.DISPLAY_NAME) : "Unknown";
 
-        Map<String, Object> creator = (Map<String, Object>) fields.get("creator");
-        String createdBy = creator != null ? (String) creator.get("displayName") : "Unknown";
+        Map<String, Object> project = (Map<String, Object>) fields.get(JiraConstant.JiraField.PROJECT);
+        String projectKey = project != null ? (String) project.get(JiraConstant.JiraField.KEY) : null;
 
-        return new JiraTaskResponse(issueKey,summary, dueDate, createdBy, createdAt, updatedAt);
-    }
+        Map<String, Object> issueTypeMap = (Map<String, Object>) fields.get(JiraConstant.JiraField.ISSUE_TYPE);
+        String issueType = issueTypeMap != null ? (String) issueTypeMap.get(JiraConstant.JiraField.NAME) : null;
+
+        Map<String, Object> statusMap = (Map<String, Object>) fields.get(JiraConstant.JiraField.STATUS);
+        String status = statusMap != null ? (String) statusMap.get(JiraConstant.JiraField.NAME) : null;
+
+        String description = null;
+        try {
+            Map<String, Object> descriptionMap = (Map<String, Object>) fields.get(JiraConstant.JiraField.DESCRIPTION);
+            List<Map<String, Object>> contentList = (List<Map<String, Object>>) descriptionMap.get("content");
+            Map<String, Object> paragraph = contentList != null && !contentList.isEmpty() ? contentList.get(0) : null;
+            List<Map<String, Object>> textList = paragraph != null ? (List<Map<String, Object>>) paragraph.get("content") : null;
+            description = textList != null && !textList.isEmpty() ? (String) textList.get(0).get("text") : null;
+        } catch (Exception e) {
+            description = null;
+        }
+        return JiraTaskResponse.builder()
+                .issueKey(issueKey)
+                .summary(summary)
+                .dueDate(dueDate)
+                .createdBy(createdBy)
+                .createdAt(createdAt)
+                .updatedAt(updatedAt)
+                .projectKey(projectKey)
+                .description(description)
+                .status(status)
+                .issueType(issueType)
+                .build();    }
     private PlatformCredential getJiraCredential(String jiraEmail) {
         return platformCredentialRepository
                 .findByPlatformEmailAndType(jiraEmail, PlatformConstant.JIRA)
                 .orElse(null);
     }
 
-    public Map<String, Object> createJiraTask(String jiraEmail,
-                                              String projectKey,
-                                              String summary,
-                                              String description) {
-        PlatformCredential credential = this.getJiraCredential(jiraEmail);
+    public Map<String, Object> createJiraTask(JiraCreateTaskRequest request) {
+        PlatformCredential credential = this.getJiraCredential(request.getJiraEmail());
         if (credential == null) return null;
 
         String cloudId = credential.getPlatformCloudId();
-        String url = String.format("https://api.atlassian.com/ex/jira/%s/rest/api/3/issue", cloudId);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(credential.getPlatformToken().getAccessToken());
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        Map<String, Object> descriptionContent = Map.of(
-                "type", "doc",
-                "version", 1,
-                "content", List.of(
-                        Map.of(
-                                "type", "paragraph",
-                                "content", List.of(
-                                        Map.of(
-                                                "type", "text",
-                                                "text", description
-                                        )
-                                )
-                        )
-                )
-        );
+        String url = String.format(URL_TEMPLATE_CREATE, cloudId);
 
         Map<String, Object> fields = Map.of(
-                "fields", Map.of(
-                        "project", Map.of("key", projectKey),
-                        "summary", summary,
-                        "description", descriptionContent,
-                        "issuetype", Map.of("name", "Task")
+                JiraConstant.JiraField.FIELDS, Map.of(
+                        JiraConstant.JiraField.PROJECT, Map.of(JiraConstant.JiraField.KEY, request.getProjectKey()),
+                        JiraConstant.JiraField.SUMMARY, request.getSummary(),
+                        JiraConstant.JiraField.DESCRIPTION, buildDescriptionContent(request.getDescription()),
+                        JiraConstant.JiraField.ISSUE_TYPE, Map.of(JiraConstant.JiraField.NAME, JiraConstant.IssueType.Task)
                 )
         );
 
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(fields, headers);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(fields, buildHeaders(credential));
         RestTemplate restTemplate = new RestTemplate();
 
         ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
         return response.getBody();
     }
 
-    public void updateJiraTask(String jiraEmail, String issueKey, String newSummary, String newDescription) {
-        PlatformCredential credential = getJiraCredential(jiraEmail);
-        if (credential == null) return;
+    public Map<String, Object> updateJiraTask(JiraUpdateTaskRequest request) {
+        PlatformCredential credential = this.getJiraCredential(request.getJiraEmail());
+        if (credential == null) return null;
 
         String cloudId = credential.getPlatformCloudId();
-        String url = String.format("https://api.atlassian.com/ex/jira/%s/rest/api/3/issue/%s", cloudId, issueKey);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(credential.getPlatformToken().getAccessToken());
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        String url = String.format(ISSUE_UPDATE_URL_TEMPLATE, cloudId, request.getIssueKey());
 
         Map<String, Object> fields = Map.of(
-                "fields", Map.of(
-                        "summary", newSummary,
-                        "description", newDescription
+                fr.epita.yeea2.constant.JiraConstant.JiraField.FIELDS, Map.of(
+                        fr.epita.yeea2.constant.JiraConstant.JiraField.SUMMARY, request.getSummary(),
+                        fr.epita.yeea2.constant.JiraConstant.JiraField.DESCRIPTION, this.buildDescriptionContent(request.getDescription())
                 )
         );
 
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(fields, headers);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(fields, this.buildHeaders(credential));
         RestTemplate restTemplate = new RestTemplate();
-        restTemplate.exchange(url, HttpMethod.PUT, entity, Void.class);
+
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.PUT, entity, Map.class);
+        return response.getBody();
     }
+
+    private Map<String, Object> buildDescriptionContent(String description) {
+        return Map.of(
+                FIELD_TYPE, DOC_TYPE,
+                FIELD_VERSION, DOC_VERSION,
+                FIELD_CONTENT, List.of(
+                        Map.of(
+                                FIELD_TYPE, PARAGRAPH_TYPE,
+                                FIELD_CONTENT, List.of(
+                                        Map.of(
+                                                FIELD_TYPE, TEXT_TYPE,
+                                                "text", description
+                                        )
+                                )
+                        )
+                )
+        );
+    }
+
+    private HttpHeaders buildHeaders(PlatformCredential credential) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(credential.getPlatformToken().getAccessToken());
+        headers.setContentType(DEFAULT_MEDIA_TYPE);
+        return headers;
+    }
+
 
     public void deleteJiraTask(String jiraEmail, String issueKey) {
         PlatformCredential credential = getJiraCredential(jiraEmail);

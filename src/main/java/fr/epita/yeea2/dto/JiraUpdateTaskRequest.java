@@ -3,6 +3,6 @@ package fr.epita.yeea2.dto;
 import lombok.Data;
 
 @Data
-public class UpdateJiraTaskRequest extends BaseJiraModifyRequest {
+public class JiraUpdateTaskRequest extends BaseJiraModifyRequest {
     private String issueKey;
 }
