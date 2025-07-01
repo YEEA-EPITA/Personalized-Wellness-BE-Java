@@ -51,7 +51,7 @@ public class JiraController {
         String authUrl = "https://auth.atlassian.com/authorize" +
                 "?audience=api.atlassian.com" +
                 "&client_id=" + clientId +
-                "&scope=read:me%20read:jira-user%20read:jira-work%20write:jira-work%20delete:jira-work%20offline_access&"+
+                "&scope=read:me%20read:jira-user%20read:jira-work%20write:jira-work%20delete:jira-work%20offline_access"+
                 "&redirect_uri=" + redirectUri +
                 "&response_type=code" +
                 "&prompt=consent" +
