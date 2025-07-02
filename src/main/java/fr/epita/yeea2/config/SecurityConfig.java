@@ -41,7 +41,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/auth/**", "/oauth2/**") .permitAll()
-                        .requestMatchers("/jira/login", "/jira/callback").permitAll() // todo - delete after integrating with FE
+                        .requestMatchers("/jira/login", "/jira/callback").permitAll()
+                                .requestMatchers("/trello/login", "/trello/callback").permitAll()
 //                        .requestMatchers("/jira/projects").permitAll() // for testing
 //                        .requestMatchers("/jira/**").authenticated()  // secure the rest of /jira/**
                         .anyRequest().authenticated()

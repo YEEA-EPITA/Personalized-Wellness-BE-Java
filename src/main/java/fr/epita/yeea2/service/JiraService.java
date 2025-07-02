@@ -2,7 +2,7 @@ package fr.epita.yeea2.service;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
-import fr.epita.yeea2.constant.JiraConstant;
+import fr.epita.yeea2.constant.PlatformConstant.JiraConstant;
 import fr.epita.yeea2.constant.PlatformConstant;
 import fr.epita.yeea2.dto.JiraCreateTaskRequest;
 import fr.epita.yeea2.dto.JiraIssueGetRequest;
@@ -283,10 +283,10 @@ public class JiraService {
 
         String jql = String.format("project+IN+(%s)+AND+issuetype=%s+AND+((duedate>=%s+AND+duedate<=%s)+OR+(duedate+IS+EMPTY+AND+status!=%s))",
                 safeKey,
-                fr.epita.yeea2.constant.JiraConstant.IssueType.Task,
+                fr.epita.yeea2.constant.PlatformConstant.JiraConstant.IssueType.Task,
                 startDateStr,
                 endDateStr,
-                fr.epita.yeea2.constant.JiraConstant.IssueStatus.Done);
+                fr.epita.yeea2.constant.PlatformConstant.JiraConstant.IssueStatus.Done);
 
 //        String encodedJql = URLEncoder.encode(jql, StandardCharsets.UTF_8);
 
@@ -300,11 +300,11 @@ public class JiraService {
     private JiraTaskResponse simplifyTask(Map<String, Object> issue) {
         Map<String, Object> fields = (Map<String, Object>) issue.get(JiraConstant.JiraField.FIELDS);
 
-        String summary = (String) fields.get(fr.epita.yeea2.constant.JiraConstant.JiraField.SUMMARY);
-        String dueDate = (String) fields.get(fr.epita.yeea2.constant.JiraConstant.JiraField.DUEDATE);
-        String createdAt = (String) fields.get(fr.epita.yeea2.constant.JiraConstant.JiraField.CREATED);
-        String updatedAt = (String) fields.get(fr.epita.yeea2.constant.JiraConstant.JiraField.UPDATED);
-        String issueKey = (String) issue.get(fr.epita.yeea2.constant.JiraConstant.JiraField.KEY);
+        String summary = (String) fields.get(fr.epita.yeea2.constant.PlatformConstant.JiraConstant.JiraField.SUMMARY);
+        String dueDate = (String) fields.get(fr.epita.yeea2.constant.PlatformConstant.JiraConstant.JiraField.DUEDATE);
+        String createdAt = (String) fields.get(fr.epita.yeea2.constant.PlatformConstant.JiraConstant.JiraField.CREATED);
+        String updatedAt = (String) fields.get(fr.epita.yeea2.constant.PlatformConstant.JiraConstant.JiraField.UPDATED);
+        String issueKey = (String) issue.get(fr.epita.yeea2.constant.PlatformConstant.JiraConstant.JiraField.KEY);
         Map<String, Object> creator = (Map<String, Object>) fields.get(JiraConstant.JiraField.CREATOR);
         String createdBy = creator != null ? (String) creator.get(JiraConstant.JiraField.DISPLAY_NAME) : "Unknown";
 
@@ -376,9 +376,9 @@ public class JiraService {
         String url = String.format(ISSUE_UPDATE_URL_TEMPLATE, cloudId, request.getIssueKey());
 
         Map<String, Object> fields = Map.of(
-                fr.epita.yeea2.constant.JiraConstant.JiraField.FIELDS, Map.of(
-                        fr.epita.yeea2.constant.JiraConstant.JiraField.SUMMARY, request.getSummary(),
-                        fr.epita.yeea2.constant.JiraConstant.JiraField.DESCRIPTION, this.buildDescriptionContent(request.getDescription())
+                fr.epita.yeea2.constant.PlatformConstant.JiraConstant.JiraField.FIELDS, Map.of(
+                        fr.epita.yeea2.constant.PlatformConstant.JiraConstant.JiraField.SUMMARY, request.getSummary(),
+                        fr.epita.yeea2.constant.PlatformConstant.JiraConstant.JiraField.DESCRIPTION, this.buildDescriptionContent(request.getDescription())
                 )
         );
 
