@@ -34,6 +34,7 @@ public class PlatformCredential {
     @Builder
     public static class Token {
         private String accessToken;
+        private String accessTokenSecret;
         private String refreshToken;
         private String idToken; // optional (used by Google)
         private String tokenType;
