@@ -16,6 +16,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/jira")
+@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class JiraController {
 
     @Value("${jira.client-id}")

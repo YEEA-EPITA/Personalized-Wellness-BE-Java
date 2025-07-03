@@ -18,6 +18,7 @@ import java.util.concurrent.ExecutionException;
 @RestController
 @RequestMapping("/trello")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class TrelloController {
 
     private final TrelloService trelloService;

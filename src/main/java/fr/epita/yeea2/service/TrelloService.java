@@ -82,7 +82,7 @@ public class TrelloService {
             // 1. Decode state → get system token (JWT)
             String systemToken = new String(Base64.getUrlDecoder().decode(encodedState), StandardCharsets.UTF_8);
             String userEmail = jwtService.extractUsername(systemToken); // Extract email from JWT
-
+            String userId = jwtService.extractUserId(systemToken);
             // 2. Get request token from cache
             OAuth1RequestToken requestToken = requestTokenCache.get(oauthToken);
             if (requestToken == null) {
@@ -99,14 +99,16 @@ public class TrelloService {
             String trelloEmail = userInfo.get("email") != null ? userInfo.get("email").toString() : userEmail;
 
             // 5. Save to PlatformCredential table
-            return this.saveOrUpdateTrelloCredential(userEmail, accessToken, trelloUsername, fullName, trelloEmail);
+            return this.saveOrUpdateTrelloCredential(userId, userEmail, accessToken, trelloUsername, fullName, trelloEmail);
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to handle Trello OAuth callback", e);
         }
     }
 
-    public PlatformCredential saveOrUpdateTrelloCredential(String userEmail,
+    public PlatformCredential saveOrUpdateTrelloCredential(
+            String userId,
+            String userEmail,
                                                            OAuth1AccessToken accessToken,
                                                            String trelloUsername,
                                                            String fullName,
@@ -126,6 +128,7 @@ public class TrelloService {
                     PlatformCredential newCredential = PlatformCredential.builder()
                             .type(PlatformConstant.TRELLO)
                             .userEmail(userEmail)
+                            .connectorId(userId)
                             .name(fullName)
                             .platformUserId(trelloUsername)
                             .platformEmail(trelloEmail)

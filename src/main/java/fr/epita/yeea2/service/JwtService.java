@@ -90,6 +90,7 @@ public class JwtService {
         return extractAllClaims(token).get("email").toString();
     }
 
+
     private Claims extractAllClaims(String token) {
         SecretKey key = Keys.hmacShaKeyFor(secret.getBytes());
 

@@ -113,7 +113,7 @@ public class JiraService {
         // Decode system token from state
         String systemToken = new String(Base64.getUrlDecoder().decode(encodedState), StandardCharsets.UTF_8);
         String email = jwtService.extractUsername(systemToken);
-
+        String userId = jwtService.extractUserId(systemToken);
         // Step 1: Exchange authorization code for tokens
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -164,7 +164,7 @@ public class JiraService {
         String cloudId = (String) ((Map<?, ?>) cloudResponse.getBody().get(0)).get("id");
 
         // Step 5: Save everything to DB
-        return saveOrUpdateJiraCredential(email, accessToken, refreshToken, jiraEmail, atlassianUserId, cloudId);
+        return saveOrUpdateJiraCredential(userId, email, accessToken, refreshToken, jiraEmail, atlassianUserId, cloudId);
     }
 
 
@@ -198,7 +198,8 @@ public class JiraService {
         return jiraEmail;
     }
 
-    public PlatformCredential saveOrUpdateJiraCredential(String userEmail,
+    public PlatformCredential saveOrUpdateJiraCredential(String userId,
+                                                            String userEmail,
                                                          String accessToken,
                                                          String refreshToken,
                                                          String jiraEmail,
@@ -216,6 +217,7 @@ public class JiraService {
             PlatformCredential newCredential = PlatformCredential.builder()
                     .type(PlatformConstant.JIRA)
                     .userEmail(userEmail)
+                    .connectorId(userId)
                     .name(null) // set Jira name if available
                     .platformToken(token)
                     .platformUserId(atlassianUserId)
