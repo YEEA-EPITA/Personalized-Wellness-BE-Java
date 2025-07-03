@@ -36,7 +36,7 @@ public class JiraController {
     }
 
     @GetMapping("/login")
-    public void redirectToJira(
+    public ResponseEntity<?> redirectToJira(
             @RequestHeader("Authorization") String authHeader,
             HttpServletResponse response
     ) throws IOException {
@@ -57,7 +57,9 @@ public class JiraController {
                 "&prompt=consent" +
                 "&state=" + encodedState;
 
-        response.sendRedirect(authUrl);
+        ApiResponse<String> response_ = new ApiResponse<>(200, "Jira redirected", authUrl);
+
+        return ResponseEntity.ok(response_);
     }
 
     @GetMapping("/callback")

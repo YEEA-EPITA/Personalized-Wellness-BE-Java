@@ -9,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.view.RedirectView;
 
 import java.io.IOException;
 import java.util.List;
@@ -24,12 +23,13 @@ public class TrelloController {
     private final TrelloService trelloService;
 
     @GetMapping("/login")
-    public RedirectView startTrelloOAuth(
+    public ResponseEntity<?>  startTrelloOAuth(
             @RequestHeader("Authorization") String authHeader
             ) throws IOException, ExecutionException, InterruptedException {
-        String authorizationUrl = trelloService.getAuthorizationUrl(authHeader);
-        return new RedirectView(authorizationUrl);
-    }
+        String authUrl = trelloService.getAuthorizationUrl(authHeader);
+        ApiResponse<String> response_ = new ApiResponse<>(200, "Jira redirected", authUrl);
+
+        return ResponseEntity.ok(response_);    }
 
     @GetMapping("/callback")
     public ResponseEntity<?> handleCallback(@RequestParam("oauth_token") String oauthToken,
