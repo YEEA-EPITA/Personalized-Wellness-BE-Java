@@ -9,5 +9,6 @@ public class TrelloCardResponse {
     private String id;
     private String name;
     private String url;
-    private String list; // List name
+    private String listName;
+    private String listId;
 }

@@ -50,7 +50,10 @@ public class PlatformConstant {
         public static final String MEMBER_ME = BASE_API_URL + "/members/me";
         public static final String BOARD_LISTS = BASE_API_URL + "/boards/%s/lists";
         public static final String LIST_CARDS = BASE_API_URL + "/lists/%s/cards";
+        public static final String LIST_CARDS_NO_QUERY = BASE_API_URL + "/cards";
         public static final String MEMBER_BOARDS = MEMBER_ME + "/boards";
+        public static final String LIST_DETAIL = BASE_API_URL+ "/lists/%s";
+
 
     }
 

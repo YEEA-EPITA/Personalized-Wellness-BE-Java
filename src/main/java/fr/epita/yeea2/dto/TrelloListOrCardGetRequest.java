@@ -9,7 +9,8 @@ import java.util.List;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class TrelloCardGetRequest {
+public class TrelloListOrCardGetRequest {
     private String trelloEmail;
-    private List<String> boardIds; // Required
+    private List<String> boardIds;
+    private List<String> listIds;
 }

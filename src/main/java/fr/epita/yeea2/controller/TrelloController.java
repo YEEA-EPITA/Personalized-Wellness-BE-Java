@@ -1,8 +1,6 @@
 package fr.epita.yeea2.controller;
 
-import fr.epita.yeea2.dto.ApiResponse;
-import fr.epita.yeea2.dto.TrelloCardGetRequest;
-import fr.epita.yeea2.dto.TrelloCardResponse;
+import fr.epita.yeea2.dto.*;
 import fr.epita.yeea2.entity.PlatformCredential;
 import fr.epita.yeea2.service.TrelloService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -33,7 +31,7 @@ public class TrelloController {
             @RequestHeader("Authorization") String authHeader
             ) throws IOException, ExecutionException, InterruptedException {
         String authUrl = trelloService.getAuthorizationUrl(authHeader);
-        ApiResponse<String> response_ = new ApiResponse<>(200, "Jira redirected", authUrl);
+        ApiResponse<String> response_ = new ApiResponse<>(200, "Trello redirected", authUrl);
 
         return ResponseEntity.ok(response_);    }
 
@@ -81,20 +79,57 @@ public class TrelloController {
         }
     }
 
-    @PostMapping("/cards")
-    public ResponseEntity<?> getCardsFromBoards(@RequestBody TrelloCardGetRequest request) {
-        if (request.getTrelloEmail() == null || request.getBoardIds() == null || request.getBoardIds().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "trelloEmail and boardIds are required."));
+    @PostMapping("/lists")
+    public ResponseEntity<?> getListsFromBoards(@RequestBody TrelloListOrCardGetRequest request) {
+        try {
+            Map<String, List<Map<String, Object>>> result = trelloService.getListsFromBoards(request);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to fetch lists", "details", e.getMessage()));
+        }
+    }
+
+
+    @PostMapping("/cards/from-lists")
+    public ResponseEntity<?> getCardsFromListIds(@RequestBody TrelloListOrCardGetRequest request) {
+        if (request.getTrelloEmail() == null || request.getListIds() == null || request.getListIds().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "trelloEmail and listIds are required"
+            ));
         }
 
         try {
-            List<TrelloCardResponse> cards = trelloService.getCardDetailsFromBoards(request);
-            ApiResponse<List<TrelloCardResponse>> response = new ApiResponse<>(HttpStatus.OK.value(), "Retrieved cards successfully", cards);
+            List<TrelloCardResponse> cards = trelloService.getCardsFromListIds(request);
+            ApiResponse<List<TrelloCardResponse>> response = new ApiResponse<>(
+                    HttpStatus.OK.value(),
+                    "Retrieved cards successfully",
+                    cards
+            );
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            ApiResponse<List<TrelloCardResponse>> errorResponse = new ApiResponse<>(400, "Failed to retrieve cards: " + e.getMessage(), null);
+            ApiResponse<List<TrelloCardResponse>> errorResponse = new ApiResponse<>(
+                    HttpStatus.BAD_REQUEST.value(),
+                    "Failed to retrieve cards: " + e.getMessage(),
+                    null
+            );
             return ResponseEntity.badRequest().body(errorResponse);
         }
+    }
+
+    @PostMapping("/card")
+    public ResponseEntity<?> createCard(@RequestBody TrelloCardCreateRequest request) {
+        return ResponseEntity.ok(Map.of("card", trelloService.createCard(request)));
+    }
+
+    @PutMapping("/card")
+    public ResponseEntity<?> updateCard(@RequestBody TrelloCardUpdateRequest request) {
+        return ResponseEntity.ok(Map.of("card", trelloService.updateCard(request)));
+    }
+
+    @PostMapping("/card/delete")
+    public ResponseEntity<?> deleteCard(@RequestBody TrelloCardDeleteRequest request) {
+        boolean deleted = trelloService.deleteCard(request.getTrelloEmail(), request.getCardId());
+        return ResponseEntity.ok(Map.of("deleted", deleted));
     }
 
 
