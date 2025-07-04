@@ -11,8 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
@@ -78,9 +76,9 @@ public class JiraController {
     ) throws IOException {
         PlatformCredential credential = jiraService.exchangeCodeForTokens(code, state);
 
-        String systemToken = new String(Base64.getUrlDecoder().decode(state), StandardCharsets.UTF_8);
-        String redirectUrl = successfulRedirectUrl + systemToken;
-        response.sendRedirect(redirectUrl);
+//        String systemToken = new String(Base64.getUrlDecoder().decode(state), StandardCharsets.UTF_8);
+//        String redirectUrl = successfulRedirectUrl;
+        response.sendRedirect(successfulRedirectUrl);
     }
 
 

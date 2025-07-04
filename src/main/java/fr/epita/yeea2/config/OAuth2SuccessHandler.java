@@ -23,7 +23,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     @Autowired
     private UserRepository userRepository;
 
-    @Value("${platform.redirectUrl}")
+    @Value("${google.googleRedirectUrl}")
     private String googleRedirectUrl;
 
     @Override

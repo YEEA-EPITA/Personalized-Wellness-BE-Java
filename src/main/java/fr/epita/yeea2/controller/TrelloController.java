@@ -14,8 +14,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -46,7 +44,7 @@ public class TrelloController {
                                HttpServletResponse response) throws IOException {
         try {
             // 1. Decode the state into system JWT
-            String systemToken = new String(Base64.getUrlDecoder().decode(encodedState), StandardCharsets.UTF_8);
+//            String systemToken = new String(Base64.getUrlDecoder().decode(encodedState), StandardCharsets.UTF_8);
 //            String email = jwtService.extractUsername(systemToken);
 
             // 2. Handle Trello OAuth and save credential
@@ -54,7 +52,7 @@ public class TrelloController {
 
             // 3. Optionally issue a new JWT (or reuse systemToken)
 //            String jwt = jwtService.generateToken(email);
-            String redirectUrl = this.redirectUrl + systemToken;
+//            String redirectUrl = this.redirectUrl + systemToken;
             response.sendRedirect(redirectUrl);
 
         } catch (Exception e) {
