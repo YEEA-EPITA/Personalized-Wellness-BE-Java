@@ -5,12 +5,17 @@ import fr.epita.yeea2.dto.TrelloCardGetRequest;
 import fr.epita.yeea2.dto.TrelloCardResponse;
 import fr.epita.yeea2.entity.PlatformCredential;
 import fr.epita.yeea2.service.TrelloService;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -18,10 +23,12 @@ import java.util.concurrent.ExecutionException;
 @RestController
 @RequestMapping("/trello")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class TrelloController {
 
     private final TrelloService trelloService;
+
+    @Value("${platform.redirectUrl}")
+    private String redirectUrl;
 
     @GetMapping("/login")
     public ResponseEntity<?>  startTrelloOAuth(
@@ -33,17 +40,32 @@ public class TrelloController {
         return ResponseEntity.ok(response_);    }
 
     @GetMapping("/callback")
-    public ResponseEntity<?> handleCallback(@RequestParam("oauth_token") String oauthToken,
-                                            @RequestParam("oauth_verifier") String oauthVerifier,
-                                            @RequestParam("state") String encodedState) {
+    public void handleCallback(@RequestParam("oauth_token") String oauthToken,
+                               @RequestParam("oauth_verifier") String oauthVerifier,
+                               @RequestParam("state") String encodedState,
+                               HttpServletResponse response) throws IOException {
         try {
+            // 1. Decode the state into system JWT
+            String systemToken = new String(Base64.getUrlDecoder().decode(encodedState), StandardCharsets.UTF_8);
+//            String email = jwtService.extractUsername(systemToken);
+
+            // 2. Handle Trello OAuth and save credential
             PlatformCredential credential = trelloService.handleOAuthCallback(oauthToken, oauthVerifier, encodedState);
-            return ResponseEntity.ok(Map.of(
-                    "message", "Trello linked successfully",
-                    "platformCredentialId", credential.getId()
-            ));
+
+            // 3. Optionally issue a new JWT (or reuse systemToken)
+//            String jwt = jwtService.generateToken(email);
+            String redirectUrl = this.redirectUrl + systemToken;
+            response.sendRedirect(redirectUrl);
+
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "OAuth callback failed", "details", e.getMessage()));
+            // Optional: redirect to a failure page
+            String errorRedirect = UriComponentsBuilder
+                    .fromUriString(redirectUrl)
+                    .queryParam("error", "OAuthFailed")
+                    .build()
+                    .toUriString();
+
+            response.sendRedirect(errorRedirect);
         }
     }
 

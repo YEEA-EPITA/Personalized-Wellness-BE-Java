@@ -11,12 +11,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/jira")
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class JiraController {
 
     @Value("${jira.client-id}")
@@ -27,8 +28,14 @@ public class JiraController {
 
     @Value("${jira.redirect-uri}")
     private String redirectUri;
+
+    @Value("${platform.redirectUrl}")
+    private String successfulRedirectUrl;
+
     @Autowired
     private JiraService jiraService;
+
+
 
     @GetMapping("/check-auth")
     public String checkAuth() {
@@ -64,12 +71,18 @@ public class JiraController {
     }
 
     @GetMapping("/callback")
-    public ResponseEntity<PlatformCredential> handleJiraCallback(
+    public void handleJiraCallback(
             @RequestParam String code,
-            @RequestParam String state
-    ) {
-        return ResponseEntity.ok(jiraService.exchangeCodeForTokens(code, state));
+            @RequestParam String state,
+            HttpServletResponse response
+    ) throws IOException {
+        PlatformCredential credential = jiraService.exchangeCodeForTokens(code, state);
+
+        String systemToken = new String(Base64.getUrlDecoder().decode(state), StandardCharsets.UTF_8);
+        String redirectUrl = successfulRedirectUrl + systemToken;
+        response.sendRedirect(redirectUrl);
     }
+
 
     @GetMapping("/projects")
     public ResponseEntity<?> getJiraProjects(@RequestParam String jiraEmail) {
