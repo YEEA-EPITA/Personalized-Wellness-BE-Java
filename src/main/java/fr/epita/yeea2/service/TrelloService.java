@@ -12,6 +12,7 @@ import fr.epita.yeea2.entity.PlatformCredential;
 import fr.epita.yeea2.repository.PlatformCredentialRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -128,7 +129,7 @@ public class TrelloService {
                     PlatformCredential newCredential = PlatformCredential.builder()
                             .type(PlatformConstant.TRELLO)
                             .userEmail(userEmail)
-                            .connectorId(userId)
+                            .connectorId(new ObjectId(userId))
                             .name(fullName)
                             .platformUserId(trelloUsername)
                             .platformEmail(trelloEmail)

@@ -1,6 +1,10 @@
 package fr.epita.yeea2.entity;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.bson.types.ObjectId;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -23,7 +27,7 @@ public class PlatformCredential {
     private Token platformToken;
     private String platformCloudId;
 
-    private String connectorId; // Optional reference to integration connector
+    private ObjectId connectorId; // Optional reference to integration connector
 
     private Instant createdAt;
     private Instant updatedAt;

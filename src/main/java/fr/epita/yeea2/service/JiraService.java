@@ -2,8 +2,8 @@ package fr.epita.yeea2.service;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
-import fr.epita.yeea2.constant.PlatformConstant.JiraConstant;
 import fr.epita.yeea2.constant.PlatformConstant;
+import fr.epita.yeea2.constant.PlatformConstant.JiraConstant;
 import fr.epita.yeea2.dto.JiraCreateTaskRequest;
 import fr.epita.yeea2.dto.JiraIssueGetRequest;
 import fr.epita.yeea2.dto.JiraTaskResponse;
@@ -12,6 +12,7 @@ import fr.epita.yeea2.entity.PlatformCredential;
 import fr.epita.yeea2.repository.PlatformCredentialRepository;
 import fr.epita.yeea2.util.DateUtils;
 import lombok.RequiredArgsConstructor;
+import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
 
 
 @Service
@@ -164,7 +166,7 @@ public class JiraService {
         String cloudId = (String) ((Map<?, ?>) cloudResponse.getBody().get(0)).get("id");
 
         // Step 5: Save everything to DB
-        return saveOrUpdateJiraCredential(userId, email, accessToken, refreshToken, jiraEmail, atlassianUserId, cloudId);
+        return this.saveOrUpdateJiraCredential(userId, email, accessToken, refreshToken, jiraEmail, atlassianUserId, cloudId);
     }
 
 
@@ -217,7 +219,7 @@ public class JiraService {
             PlatformCredential newCredential = PlatformCredential.builder()
                     .type(PlatformConstant.JIRA)
                     .userEmail(userEmail)
-                    .connectorId(userId)
+                    .connectorId(new ObjectId(userId))
                     .name(null) // set Jira name if available
                     .platformToken(token)
                     .platformUserId(atlassianUserId)
