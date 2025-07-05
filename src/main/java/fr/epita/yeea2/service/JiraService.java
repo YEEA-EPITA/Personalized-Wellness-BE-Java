@@ -76,7 +76,7 @@ public class JiraService {
 
             // Step 1: Get cloud ID
             HttpHeaders headers = new HttpHeaders();
-            headers.setBearerAuth(credential.getPlatformToken().getAccessToken());
+            headers.setBearerAuth(credential.getTokens().getAccessToken());
             headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
             HttpEntity<Void> entity = new HttpEntity<>(headers);
 
@@ -212,7 +212,7 @@ public class JiraService {
                 .refreshToken(refreshToken)
                 .build();
         PlatformCredential savedCredential = platformCredentialRepository.findByPlatformEmailAndType(jiraEmail, PlatformConstant.JIRA).map(existing -> {
-            existing.setPlatformToken(token);
+            existing.setTokens(token);
             existing.setUpdatedAt(Instant.now());
             return platformCredentialRepository.save(existing);
         }).orElseGet(() -> {
@@ -221,7 +221,7 @@ public class JiraService {
                     .userEmail(userEmail)
                     .connectorId(new ObjectId(userId))
                     .name(null) // set Jira name if available
-                    .platformToken(token)
+                    .tokens(token)
                     .platformUserId(atlassianUserId)
                     .platformEmail(jiraEmail)
                     .platformCloudId(cloudId)
@@ -241,7 +241,7 @@ public class JiraService {
 
                 // Step 1: Get Cloud ID
                 HttpHeaders headers = new HttpHeaders();
-                headers.setBearerAuth(credential.getPlatformToken().getAccessToken());
+                headers.setBearerAuth(credential.getTokens().getAccessToken());
                 headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
                 HttpEntity<Void> entity = new HttpEntity<>(headers);
 
@@ -413,7 +413,7 @@ public class JiraService {
 
     private HttpHeaders buildHeaders(PlatformCredential credential) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(credential.getPlatformToken().getAccessToken());
+        headers.setBearerAuth(credential.getTokens().getAccessToken());
         headers.setContentType(DEFAULT_MEDIA_TYPE);
         return headers;
     }
@@ -427,7 +427,7 @@ public class JiraService {
         String url = String.format("https://api.atlassian.com/ex/jira/%s/rest/api/3/issue/%s", cloudId, issueKey);
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(credential.getPlatformToken().getAccessToken());
+        headers.setBearerAuth(credential.getTokens().getAccessToken());
 
         HttpEntity<Void> entity = new HttpEntity<>(headers);
         RestTemplate restTemplate = new RestTemplate();

@@ -131,7 +131,7 @@ public class TrelloService {
 
         return platformCredentialRepository.findByPlatformEmailAndType(trelloEmail, PlatformConstant.TRELLO)
                 .map(existing -> {
-                    existing.setPlatformToken(token);
+                    existing.setTokens(token);
                     existing.setUpdatedAt(Instant.now());
                     return platformCredentialRepository.save(existing);
                 })
@@ -143,7 +143,7 @@ public class TrelloService {
                             .name(fullName)
                             .platformUserId(trelloUsername)
                             .platformEmail(trelloEmail)
-                            .platformToken(token)
+                            .tokens(token)
                             .createdAt(Instant.now())
                             .updatedAt(Instant.now())
                             .build();
@@ -170,8 +170,8 @@ public class TrelloService {
                 .findByPlatformEmailAndType(trelloEmail, PlatformConstant.TRELLO)
                 .orElseThrow(() -> new RuntimeException("Trello credentials not found for: " + trelloEmail));
 
-        String accessToken = credential.getPlatformToken().getAccessToken();
-        String tokenSecret = credential.getPlatformToken().getAccessTokenSecret();
+        String accessToken = credential.getTokens().getAccessToken();
+        String tokenSecret = credential.getTokens().getAccessTokenSecret();
 
         OAuth1AccessToken token = new OAuth1AccessToken(accessToken, tokenSecret);
 
@@ -312,8 +312,8 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
             .orElseThrow(() -> new RuntimeException("Trello credentials not found"));
 
     OAuth1AccessToken token = new OAuth1AccessToken(
-            credential.getPlatformToken().getAccessToken(),
-            credential.getPlatformToken().getAccessTokenSecret()
+            credential.getTokens().getAccessToken(),
+            credential.getTokens().getAccessTokenSecret()
     );
 
     List<TrelloCardResponse> allCards = new ArrayList<>();
@@ -369,8 +369,8 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
                 .orElseThrow(() -> new RuntimeException("Trello credentials not found"));
 
         OAuth1AccessToken token = new OAuth1AccessToken(
-                credential.getPlatformToken().getAccessToken(),
-                credential.getPlatformToken().getAccessTokenSecret()
+                credential.getTokens().getAccessToken(),
+                credential.getTokens().getAccessTokenSecret()
         );
 
         try {
@@ -400,8 +400,8 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
                 .orElseThrow(() -> new RuntimeException("Trello credentials not found"));
 
         OAuth1AccessToken token = new OAuth1AccessToken(
-                credential.getPlatformToken().getAccessToken(),
-                credential.getPlatformToken().getAccessTokenSecret()
+                credential.getTokens().getAccessToken(),
+                credential.getTokens().getAccessTokenSecret()
         );
 
         Map<String, List<Map<String, Object>>> boardListsMap = new HashMap<>();
@@ -506,8 +506,8 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
 
     private OAuth1AccessToken buildToken(PlatformCredential credential) {
         return new OAuth1AccessToken(
-                credential.getPlatformToken().getAccessToken(),
-                credential.getPlatformToken().getAccessTokenSecret()
+                credential.getTokens().getAccessToken(),
+                credential.getTokens().getAccessTokenSecret()
         );
     }
 

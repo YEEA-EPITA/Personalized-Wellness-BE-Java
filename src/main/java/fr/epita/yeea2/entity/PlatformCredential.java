@@ -24,7 +24,7 @@ public class PlatformCredential {
     private String userEmail;     // Optional (not all platforms use email)
     private String platformEmail;
     private String platformUserId;
-    private Token platformToken;
+    private Token tokens;
     private String platformCloudId;
 
     private ObjectId connectorId; // Optional reference to integration connector
