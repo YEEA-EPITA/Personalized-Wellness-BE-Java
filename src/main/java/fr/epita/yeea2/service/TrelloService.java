@@ -138,7 +138,7 @@ public class TrelloService {
                 .orElseGet(() -> {
                     PlatformCredential newCredential = PlatformCredential.builder()
                             .type(PlatformConstant.TRELLO)
-                            .userEmail(userEmail)
+                            .email(userEmail)
                             .connectorId(new ObjectId(userId))
                             .name(fullName)
                             .platformUserId(trelloUsername)

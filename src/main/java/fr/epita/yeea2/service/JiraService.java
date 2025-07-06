@@ -218,7 +218,7 @@ public class JiraService {
         }).orElseGet(() -> {
             PlatformCredential newCredential = PlatformCredential.builder()
                     .type(PlatformConstant.JIRA)
-                    .userEmail(userEmail)
+                    .email(userEmail)
                     .connectorId(new ObjectId(userId))
                     .name(null) // set Jira name if available
                     .tokens(token)
