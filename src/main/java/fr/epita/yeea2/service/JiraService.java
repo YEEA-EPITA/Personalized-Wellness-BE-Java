@@ -285,13 +285,13 @@ public class JiraService {
 
         String safeKey = joinedKeys.replace("%", "\\%");
 
-        String jql = String.format("project+IN+(%s)+AND+issuetype=%s+AND+((duedate>=%s+AND+duedate<=%s)+OR+(duedate+IS+EMPTY+AND+status!=%s))",
+        String jql = String.format("project+IN+(%s)+AND+issuetype=%s+AND+((duedate>=%s+AND+duedate<=%s)+OR+(duedate+IS+EMPTY))",
                 safeKey,
                 fr.epita.yeea2.constant.PlatformConstant.JiraConstant.IssueType.Task,
                 startDateStr,
                 endDateStr,
                 fr.epita.yeea2.constant.PlatformConstant.JiraConstant.IssueStatus.Done);
-
+//+AND+status!=%s
 //        String encodedJql = URLEncoder.encode(jql, StandardCharsets.UTF_8);
 
         return String.format(

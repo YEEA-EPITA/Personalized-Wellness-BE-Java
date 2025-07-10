@@ -28,6 +28,9 @@ public class JwtService {
     @Value("${jwt.refresh_token_expiry}")
     private String refreshExpiryTime;
 
+    @Value("${jwt.token_expiry}")
+    private String tokenExpiryTime;
+
     @Autowired
     private UserRepository userRepository;
 
@@ -64,7 +67,7 @@ public class JwtService {
 
         // iat and exp
         Date issuedAt = new Date();
-        Date expiration = new Date(issuedAt.getTime() + 3600 * 1000); // 1 hour
+        Date expiration = new Date(issuedAt.getTime() + tokenExpiryTime); // 1 hour
 
         return Jwts.builder()
                 .claim("email", email)
