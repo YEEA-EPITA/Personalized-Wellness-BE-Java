@@ -29,7 +29,7 @@ public class JwtService {
     private String refreshExpiryTime;
 
     @Value("${jwt.token_expiry}")
-    private String tokenExpiryTime;
+    private long tokenExpiryTime;
 
     @Autowired
     private UserRepository userRepository;
