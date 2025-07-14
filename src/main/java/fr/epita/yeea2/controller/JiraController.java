@@ -138,6 +138,29 @@ public class JiraController {
         }
     }
 
+    @PostMapping("/status/update")
+    public ResponseEntity<Map<String, Object>> updateJiraStatus(@RequestBody JiraUpdateStatusRequest request) {
+        // Retrieve the Jira credentials (platformCredential) from your database or authentication service
+        PlatformCredential credential = jiraService.getJiraCredential(request.getJiraEmail());
+        if (credential == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Invalid Jira credentials"));
+        }
+
+        String cloudId = credential.getPlatformCloudId();
+        String accessToken = credential.getTokens().getAccessToken();
+
+        try {
+            // Update the status of the Jira issue
+            jiraService.updateIssueStatus(request.getIssueKey(), request.getNewStatus(), accessToken, cloudId);
+
+            return ResponseEntity.ok(Map.of("message", "Jira issue status updated successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Error updating Jira issue status", "error", e.getMessage()));
+        }
+    }
+
     @PostMapping("/task/delete")
     public ResponseEntity<ApiResponse<String>> deleteTask(@RequestBody JiraDeleteIssueRequest request) {
         try {

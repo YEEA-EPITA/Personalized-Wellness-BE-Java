@@ -11,4 +11,7 @@ public class TrelloCardResponse {
     private String url;
     private String listName;
     private String listId;
+    private String description;
+    private String createdAt;
+    private String updatedAt;
 }

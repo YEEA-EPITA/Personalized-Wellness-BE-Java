@@ -352,7 +352,10 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
                         (String) card.get("name"),
                         (String) card.get("url"),
                         listName,
-                        listId
+                        listId,
+                        (String) card.get("desc"),
+                        (String) card.get("dateLastActivity"),
+                        (String) card.get("dateLastActivity")
                 ));
             }
         } catch (Exception e) {

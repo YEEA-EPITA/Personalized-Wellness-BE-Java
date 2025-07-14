@@ -14,6 +14,7 @@ import fr.epita.yeea2.util.DateUtils;
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -251,8 +252,10 @@ public class JiraService {
                     throw new RuntimeException("No accessible resources found.");
                 }
 
-                String startDateStr = DateUtils.formatDate(request.getStartDate());
-                String endDateStr = DateUtils.formatDate(request.getEndDate());
+                String startDateStr;
+                startDateStr = request.getStartDate() != null? DateUtils.formatDate(request.getStartDate()) : null;
+                String endDateStr;
+                endDateStr = request.getEndDate() != null ? DateUtils.formatDate(request.getEndDate()) : null;
 
                 // Step 2: Get issues for the specified projects
                 String url = this.buildSearchUrl(cloudId, request.getJiraProjects(),startDateStr,endDateStr);
@@ -282,15 +285,21 @@ public class JiraService {
                 .map(key -> "\"" + key + "\"") // quote each key for safety
                 .collect(Collectors.joining(", "));
 
-
+        String jql;
         String safeKey = joinedKeys.replace("%", "\\%");
-
-        String jql = String.format("project+IN+(%s)+AND+issuetype=%s+AND+((duedate>=%s+AND+duedate<=%s)+OR+(duedate+IS+EMPTY))",
-                safeKey,
-                fr.epita.yeea2.constant.PlatformConstant.JiraConstant.IssueType.Task,
-                startDateStr,
-                endDateStr,
-                fr.epita.yeea2.constant.PlatformConstant.JiraConstant.IssueStatus.Done);
+        if (startDateStr != null && endDateStr != null) {
+             jql = String.format("project+IN+(%s)+AND+issuetype=%s+AND+((duedate>=%s+AND+duedate<=%s)+OR+(duedate+IS+EMPTY))",
+                    safeKey,
+                    fr.epita.yeea2.constant.PlatformConstant.JiraConstant.IssueType.Task,
+                    startDateStr,
+                    endDateStr,
+                    fr.epita.yeea2.constant.PlatformConstant.JiraConstant.IssueStatus.Done);
+        } else {
+            jql = String.format("project+IN+(%s)+AND+issuetype=%s",
+                    safeKey,
+                    fr.epita.yeea2.constant.PlatformConstant.JiraConstant.IssueType.Task,
+                    fr.epita.yeea2.constant.PlatformConstant.JiraConstant.IssueStatus.Done);
+        }
 //+AND+status!=%s
 //        String encodedJql = URLEncoder.encode(jql, StandardCharsets.UTF_8);
 
@@ -343,7 +352,7 @@ public class JiraService {
                 .status(status)
                 .issueType(issueType)
                 .build();    }
-    private PlatformCredential getJiraCredential(String jiraEmail) {
+    public PlatformCredential getJiraCredential(String jiraEmail) {
         return platformCredentialRepository
                 .findByPlatformEmailAndType(jiraEmail, PlatformConstant.JIRA)
                 .orElse(null);
@@ -433,5 +442,43 @@ public class JiraService {
         RestTemplate restTemplate = new RestTemplate();
         restTemplate.exchange(url, HttpMethod.DELETE, entity, Void.class);
     }
+
+    public String getTransitionId(String issueKey, String targetStatus, String accessToken, String cloudId) {
+        String url = "https://api.atlassian.com/ex/jira/" + cloudId + "/rest/api/3/issue/" + issueKey + "/transitions";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                url, HttpMethod.GET, entity, new ParameterizedTypeReference<>() {}
+        );
+
+        List<Map<String, Object>> transitions = (List<Map<String, Object>>) response.getBody().get("transitions");
+        for (Map<String, Object> transition : transitions) {
+            if (transition.get("name").equals(targetStatus)) {
+                return (String) transition.get("id");
+            }
+        }
+        return null;
+    }
+
+    public void updateIssueStatus(String issueKey, String newStatus, String accessToken, String cloudId) {
+        String transitionId = this.getTransitionId(issueKey, newStatus, accessToken, cloudId);
+        if (transitionId == null) throw new RuntimeException("No transition found for status: " + newStatus);
+
+        String url = "https://api.atlassian.com/ex/jira/" + cloudId + "/rest/api/3/issue/" + issueKey + "/transitions";
+
+        Map<String, Object> transition = Map.of("id", transitionId);
+        Map<String, Object> body = Map.of("transition", transition);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+
+        restTemplate.postForEntity(url, entity, String.class);
+    }
+
 
 }

@@ -118,12 +118,12 @@ public class TrelloController {
 
     @PostMapping("/card")
     public ResponseEntity<?> createCard(@RequestBody TrelloCardCreateRequest request) {
-        return ResponseEntity.ok(Map.of("card", trelloService.createCard(request)));
+        return ResponseEntity.ok(trelloService.createCard(request));
     }
 
     @PutMapping("/card")
     public ResponseEntity<?> updateCard(@RequestBody TrelloCardUpdateRequest request) {
-        return ResponseEntity.ok(Map.of("card", trelloService.updateCard(request)));
+        return ResponseEntity.ok(trelloService.updateCard(request));
     }
 
     @PostMapping("/card/delete")
