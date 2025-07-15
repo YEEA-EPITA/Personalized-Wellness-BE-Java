@@ -355,8 +355,9 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
                         listId,
                         (String) card.get("desc"),
                         (String) card.get("dateLastActivity"),
-                        (String) card.get("dateLastActivity")
-                ));
+                        (String) card.get("dateLastActivity"),
+                        (String) card.get("due")
+                        ));
             }
         } catch (Exception e) {
             throw new RuntimeException("Failed to get cards from list " + listId, e);
@@ -461,14 +462,14 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
     }
 
     public Map<String, Object> updateCard(TrelloCardUpdateRequest request) {
-        PlatformCredential credential = getCredential(request.getTrelloEmail());
+        PlatformCredential credential = this.getCredential(request.getTrelloEmail());
         OAuth1AccessToken token = buildToken(credential);
 
         String url = PlatformConstant.TrelloConstant.LIST_CARDS_NO_QUERY + "/" + request.getCardId();
         OAuthRequest updateRequest = new OAuthRequest(Verb.PUT, url);
         updateRequest.addParameter("name", request.getName());
         updateRequest.addParameter("desc", request.getDescription());
-
+        updateRequest.addParameter("idList", request.getListId());
         service.signRequest(token, updateRequest);
 
         try {
@@ -483,7 +484,7 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
     }
 
     public boolean deleteCard(String trelloEmail, String cardId) {
-        PlatformCredential credential = getCredential(trelloEmail);
+        PlatformCredential credential = this.getCredential(trelloEmail);
         OAuth1AccessToken token = buildToken(credential);
 
         String url = PlatformConstant.TrelloConstant.LIST_CARDS_NO_QUERY + "/" + cardId;

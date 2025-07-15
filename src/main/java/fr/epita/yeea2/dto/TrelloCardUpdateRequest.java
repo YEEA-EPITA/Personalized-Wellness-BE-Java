@@ -12,4 +12,5 @@ public class TrelloCardUpdateRequest {
     private String cardId;
     private String name;
     private String description;
+    private String listId;
 }

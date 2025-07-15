@@ -14,4 +14,6 @@ public class TrelloCardResponse {
     private String description;
     private String createdAt;
     private String updatedAt;
+//    private String createdBy;
+    private String dueDate;
 }
