@@ -42,6 +42,8 @@ public class PlatformConstant {
             public static final String FIELDS = "fields";
             public static final String ISSUE_TYPE = "issuetype";
             public static final String NAME = "name";
+            public static final String EMAIL = "emailAddress";
+            public static final String IMG = "avatarUrls";
         }
     }
 

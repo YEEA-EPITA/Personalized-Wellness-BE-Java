@@ -7,4 +7,5 @@ public class BaseJiraModifyRequest {
     protected String jiraEmail;
     protected String summary;
     protected String description;
+    protected String cloudId;
 }

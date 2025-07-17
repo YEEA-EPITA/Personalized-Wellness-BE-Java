@@ -9,6 +9,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.List;
 
 @Document(collection = "platforms")
 @Data
@@ -25,7 +26,7 @@ public class PlatformCredential {
     private String platformEmail;
     private String platformUserId;
     private Token tokens;
-    private String platformCloudId;
+    private List<String> platformCloudIds;
 
     private ObjectId connectorId; // Optional reference to integration connector
 

@@ -2,12 +2,11 @@ package fr.epita.yeea2.service;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.epita.yeea2.constant.PlatformConstant;
 import fr.epita.yeea2.constant.PlatformConstant.JiraConstant;
-import fr.epita.yeea2.dto.JiraCreateTaskRequest;
-import fr.epita.yeea2.dto.JiraIssueGetRequest;
-import fr.epita.yeea2.dto.JiraTaskResponse;
-import fr.epita.yeea2.dto.JiraUpdateTaskRequest;
+import fr.epita.yeea2.dto.*;
 import fr.epita.yeea2.entity.PlatformCredential;
 import fr.epita.yeea2.repository.PlatformCredentialRepository;
 import fr.epita.yeea2.util.DateUtils;
@@ -21,10 +20,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 
@@ -70,7 +66,7 @@ public class JiraService {
 
 
 
-    public List<Map<String, Object>> getProjects(String jiraEmai) {
+    public List<JiraProjectResponse> getProjects(String jiraEmai) {
         PlatformCredential credential = platformCredentialRepository.findByPlatformEmailAndType(jiraEmai, PlatformConstant.JIRA).orElse(null);
         if (credential != null) {
             RestTemplate restTemplate = new RestTemplate();
@@ -81,31 +77,35 @@ public class JiraService {
             headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
             HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-            String cloudId = credential.getPlatformCloudId();
+            List<String> cloudIds = credential.getPlatformCloudIds();
 
-            if (cloudId == null || cloudId.isEmpty()) {
+            if (cloudIds.isEmpty() || cloudIds.size() ==0) {
                 throw new RuntimeException("No accessible resources found.");
             }
 
             // Step 2: Fetch projects
-            ResponseEntity<Map> projectResponse = restTemplate.exchange(
-                    "https://api.atlassian.com/ex/jira/" + cloudId + "/rest/api/3/project/search",
-                    HttpMethod.GET,
-                    entity,
-                    Map.class
-            );
-            // Extract and simplify project info
-            List<Map<String, Object>> rawProjects = (List<Map<String, Object>>) projectResponse.getBody().get("values");
+            List<JiraProjectResponse> projects = new ArrayList<>();
+            cloudIds.forEach(cloudId -> {
+                ResponseEntity<Map> projectResponse = restTemplate.exchange(
+                        "https://api.atlassian.com/ex/jira/" + cloudId + "/rest/api/3/project/search",
+                        HttpMethod.GET,
+                        entity,
+                        Map.class
+                );
+                // Extract and simplify project info
+                Object valuesObj = projectResponse.getBody().get("values");
 
-            List<Map<String, Object>> simplifiedProjects = rawProjects.stream()
-                    .map(project -> Map.of(
-                            "id", project.get("id"),
-                            "key", project.get("key"),
-                            "name", project.get("name")
-                    ))
-                    .collect(Collectors.toList());
+                ObjectMapper objectMapper = new ObjectMapper();
+                List<JiraProjectResponse> rawProjects = objectMapper.convertValue(
+                        valuesObj,
+                        new TypeReference<List<JiraProjectResponse>>() {}
+                );
+                rawProjects.forEach(p -> p.setCloudId(cloudId));
 
-            return simplifiedProjects;
+                projects.addAll(rawProjects);
+            });
+
+            return projects;
         }
         return Collections.emptyList();
 //        }
@@ -114,7 +114,13 @@ public class JiraService {
 
     public PlatformCredential exchangeCodeForTokens(String code, String encodedState) {
         // Decode system token from state
+        String decodedState = new String(Base64.getUrlDecoder().decode(encodedState), StandardCharsets.UTF_8);
+//        JSONObject stateJson = new JSONObject(decodedState);
+
         String systemToken = new String(Base64.getUrlDecoder().decode(encodedState), StandardCharsets.UTF_8);
+//        String selectedSite = stateJson.getString("site"); // <-- important!
+
+
         String email = jwtService.extractUsername(systemToken);
         String userId = jwtService.extractUserId(systemToken);
         // Step 1: Exchange authorization code for tokens
@@ -146,12 +152,38 @@ public class JiraService {
         String atlassianUserId = decoded.getSubject();
 
         // Step 3: Fetch Jira email
-        String jiraEmail = getJiraEmailFromAccessToken(accessToken);
+        String jiraEmail = this.getJiraEmailFromAccessToken(accessToken);
 
         // Step 4: Fetch cloudId
-        HttpHeaders cloudHeaders = new HttpHeaders();
-        cloudHeaders.setBearerAuth(accessToken);
-        HttpEntity<Void> cloudEntity = new HttpEntity<>(cloudHeaders);
+//        HttpHeaders cloudHeaders = new HttpHeaders();
+//        cloudHeaders.setBearerAuth(accessToken);
+//        HttpEntity<Void> cloudEntity = new HttpEntity<>(cloudHeaders);
+//
+//        ResponseEntity<List> cloudResponse = restTemplate.exchange(
+//                "https://api.atlassian.com/oauth/token/accessible-resources",
+//                HttpMethod.GET,
+//                cloudEntity,
+//                List.class
+//        );
+//
+//        if (cloudResponse.getBody() == null || cloudResponse.getBody().isEmpty()) {
+//            throw new RuntimeException("No accessible resources found.");
+//        }
+        List<Map<String, Object>> accessibleResources= this.getAccessibleResources(accessToken);
+// Then in accessible-resources matching:
+        List<String> cloudIds = accessibleResources.stream()
+                .map(resource -> resource.get("id").toString())
+                .collect(Collectors.toList());
+        // Step 5: Save everything to DB
+        return this.saveOrUpdateJiraCredential(userId, email, accessToken, refreshToken, jiraEmail, atlassianUserId, cloudIds);
+    }
+
+    public List<Map<String, Object>> getAccessibleResources(String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        HttpEntity<Void> cloudEntity = new HttpEntity<>(headers);
+
+        RestTemplate restTemplate = new RestTemplate();
 
         ResponseEntity<List> cloudResponse = restTemplate.exchange(
                 "https://api.atlassian.com/oauth/token/accessible-resources",
@@ -164,10 +196,9 @@ public class JiraService {
             throw new RuntimeException("No accessible resources found.");
         }
 
-        String cloudId = (String) ((Map<?, ?>) cloudResponse.getBody().get(0)).get("id");
-
-        // Step 5: Save everything to DB
-        return this.saveOrUpdateJiraCredential(userId, email, accessToken, refreshToken, jiraEmail, atlassianUserId, cloudId);
+        // Cast the generic list to List<Map<String, Object>>
+        List<Map<String, Object>> resources = (List<Map<String, Object>>) cloudResponse.getBody();
+        return resources;
     }
 
 
@@ -207,7 +238,7 @@ public class JiraService {
                                                          String refreshToken,
                                                          String jiraEmail,
                                                          String atlassianUserId,
-                                                         String cloudId) {
+                                                         List<String> cloudIds) {
         PlatformCredential.Token token = PlatformCredential.Token.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
@@ -225,7 +256,7 @@ public class JiraService {
                     .tokens(token)
                     .platformUserId(atlassianUserId)
                     .platformEmail(jiraEmail)
-                    .platformCloudId(cloudId)
+                    .platformCloudIds(cloudIds)
                     .createdAt(Instant.now())
                     .updatedAt(Instant.now())
                     .build();
@@ -246,9 +277,9 @@ public class JiraService {
                 headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
                 HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-                String cloudId = credential.getPlatformCloudId();
+                List<String> cloudIds = credential.getPlatformCloudIds();
 
-                if (cloudId == null || cloudId.isEmpty()) {
+                if (cloudIds.isEmpty() || cloudIds.size() ==0) {
                     throw new RuntimeException("No accessible resources found.");
                 }
 
@@ -258,20 +289,29 @@ public class JiraService {
                 endDateStr = request.getEndDate() != null ? DateUtils.formatDate(request.getEndDate()) : null;
 
                 // Step 2: Get issues for the specified projects
-                String url = this.buildSearchUrl(cloudId, request.getJiraProjects(),startDateStr,endDateStr);
+                List<JiraTaskResponse> issues = new ArrayList<>();
+                cloudIds.forEach(cloudId -> {
+                    String url = this.buildSearchUrl(cloudId, request.getJiraProjects(),startDateStr,endDateStr);
+                    try{
+                    ResponseEntity<Map> response = restTemplate.exchange(
+                            url,
+                            HttpMethod.GET,
+                            entity,
+                            Map.class
+                    );
+                    if (response.getStatusCode().is2xxSuccessful()) {
+                        List<Map<String, Object>> rawIssues = (List<Map<String, Object>>) response.getBody().get("issues");
+                        List<JiraTaskResponse> simplifiedIssues = rawIssues.stream()
+                                .map(i -> this.simplifyTask(i,cloudId)
+                                )
+                                .collect(Collectors.toList());
+                        issues.addAll(simplifiedIssues);
+                    }} catch (Exception ex){
+                        //do nothing because fetching prj from another site
+                    }
+                });
 
-                ResponseEntity<Map> response = restTemplate.exchange(
-                        url,
-                        HttpMethod.GET,
-                        entity,
-                        Map.class
-                );
-
-                List<Map<String, Object>> rawIssues = (List<Map<String, Object>>) response.getBody().get("issues");
-
-                return rawIssues.stream()
-                        .map(this::simplifyTask)
-                        .collect(Collectors.toList());
+                return issues;
             }
             return Collections.emptyList();
         } catch (Exception e) {
@@ -310,7 +350,7 @@ public class JiraService {
         );
     }
 
-    private JiraTaskResponse simplifyTask(Map<String, Object> issue) {
+    private JiraTaskResponse simplifyTask(Map<String, Object> issue, String cloudId) {
         Map<String, Object> fields = (Map<String, Object>) issue.get(JiraConstant.JiraField.FIELDS);
 
         String summary = (String) fields.get(fr.epita.yeea2.constant.PlatformConstant.JiraConstant.JiraField.SUMMARY);
@@ -329,6 +369,17 @@ public class JiraService {
 
         Map<String, Object> statusMap = (Map<String, Object>) fields.get(JiraConstant.JiraField.STATUS);
         String status = statusMap != null ? (String) statusMap.get(JiraConstant.JiraField.NAME) : null;
+
+        Map<String,Object> assigneeMap = (Map<String, Object>) fields.get(JiraConstant.JiraField.ASSIGNEE);
+        String assignedBy = assigneeMap != null ? (String) assigneeMap.get(JiraConstant.JiraField.DISPLAY_NAME) : null;
+
+        JiraProfileResponse assignedByResponse = null;
+        if (assigneeMap != null) {
+            assignedByResponse = new JiraProfileResponse();
+            assignedByResponse.setName((String) assigneeMap.get(JiraConstant.JiraField.DISPLAY_NAME));
+            assignedByResponse.setEmail((String) assigneeMap.get(JiraConstant.JiraField.EMAIL));
+            assignedByResponse.setImgUrl(this.extractAvatar48x48(assigneeMap));
+        }
 
         String description = null;
         try {
@@ -351,6 +402,8 @@ public class JiraService {
                 .description(description)
                 .status(status)
                 .issueType(issueType)
+                .cloudId(cloudId)
+                .assignedBy(assignedByResponse)
                 .build();    }
     public PlatformCredential getJiraCredential(String jiraEmail) {
         return platformCredentialRepository
@@ -358,11 +411,20 @@ public class JiraService {
                 .orElse(null);
     }
 
+
+    public String extractAvatar48x48(Map<String, Object> userData) {
+        Map<String, Object> avatarUrls = (Map<String, Object>) userData.get(JiraConstant.JiraField.IMG);
+        if (avatarUrls != null && avatarUrls.containsKey("48x48")) {
+            return avatarUrls.get("48x48").toString();
+        }
+        return null;
+    }
+
     public Map<String, Object> createJiraTask(JiraCreateTaskRequest request) {
         PlatformCredential credential = this.getJiraCredential(request.getJiraEmail());
         if (credential == null) return null;
 
-        String cloudId = credential.getPlatformCloudId();
+        String cloudId = request.getCloudId();
         String url = String.format(URL_TEMPLATE_CREATE, cloudId);
 
         Map<String, Object> fields = Map.of(
@@ -374,7 +436,7 @@ public class JiraService {
                 )
         );
 
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(fields, buildHeaders(credential));
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(fields, this.buildHeaders(credential));
         RestTemplate restTemplate = new RestTemplate();
 
         ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
@@ -385,7 +447,7 @@ public class JiraService {
         PlatformCredential credential = this.getJiraCredential(request.getJiraEmail());
         if (credential == null) return null;
 
-        String cloudId = credential.getPlatformCloudId();
+        String cloudId = request.getCloudId();
         String url = String.format(ISSUE_UPDATE_URL_TEMPLATE, cloudId, request.getIssueKey());
 
         Map<String, Object> fields = Map.of(
@@ -432,7 +494,7 @@ public class JiraService {
         PlatformCredential credential = getJiraCredential(jiraEmail);
         if (credential == null) return;
 
-        String cloudId = credential.getPlatformCloudId();
+        String cloudId = credential.getPlatformCloudIds().get(0);
         String url = String.format("https://api.atlassian.com/ex/jira/%s/rest/api/3/issue/%s", cloudId, issueKey);
 
         HttpHeaders headers = new HttpHeaders();

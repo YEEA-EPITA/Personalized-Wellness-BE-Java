@@ -20,5 +20,6 @@ public class JiraTaskResponse {
     private String description;
     private String projectKey;
     private String issueType;
-
+    private String cloudId;
+    private JiraProfileResponse assignedBy;
 }

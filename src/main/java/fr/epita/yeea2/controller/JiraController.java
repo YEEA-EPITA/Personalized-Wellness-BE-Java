@@ -44,6 +44,7 @@ public class JiraController {
     @GetMapping("/login")
     public ResponseEntity<?> redirectToJira(
             @RequestHeader("Authorization") String authHeader,
+//            @RequestParam("site") String siteUrl,  // selected Jira site
             HttpServletResponse response
     ) throws IOException {
         String systemToken = authHeader.replace("Bearer ", "");
@@ -81,12 +82,11 @@ public class JiraController {
         response.sendRedirect(successfulRedirectUrl);
     }
 
-
     @GetMapping("/projects")
     public ResponseEntity<?> getJiraProjects(@RequestParam String jiraEmail) {
         try {
-            List<Map<String, Object>> projects = jiraService.getProjects(jiraEmail);
-            ApiResponse<List<Map<String, Object>>> response = new ApiResponse<>(200, "Login successful", projects);
+            List<JiraProjectResponse> projects = jiraService.getProjects(jiraEmail);
+            ApiResponse<List<JiraProjectResponse>> response = new ApiResponse<>(200, "Login successful", projects);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -147,7 +147,7 @@ public class JiraController {
                     .body(Map.of("message", "Invalid Jira credentials"));
         }
 
-        String cloudId = credential.getPlatformCloudId();
+        String cloudId = request.getCloudId();
         String accessToken = credential.getTokens().getAccessToken();
 
         try {
