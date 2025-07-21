@@ -3,7 +3,6 @@ package fr.epita.yeea2.service;
 import fr.epita.yeea2.dto.BurnoutStatusDailyResponse;
 import fr.epita.yeea2.dto.BurnoutStatusResponse;
 import fr.epita.yeea2.entity.AppUser;
-import fr.epita.yeea2.entity.BurnoutStatus;
 import fr.epita.yeea2.entity.RecoveryRecommendationType;
 import fr.epita.yeea2.entity.TaskStatus;
 import fr.epita.yeea2.repository.BurnoutStatusRepository;
@@ -81,75 +80,66 @@ public class BurnoutCalculatorService {
                 .build();
     }
 
-    public BurnoutStatusResponse calculateWeeklyBurnoutScore() {
+    public List<BurnoutStatusResponse> calculateWeeklyBurnoutScore() {
         String email = getEmailFromSecurityContext();
         AppUser user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         String userId = user.getId();
 
-        LocalDateTime startOfWeek = LocalDate.now().with(DayOfWeek.MONDAY).atStartOfDay();
-        LocalDateTime endOfWeek = LocalDate.now().with(DayOfWeek.SUNDAY).atTime(LocalTime.MAX);
-        List<TaskStatus> weeklyTasks = taskStatusRepository.findByUserIdAndStartTimeBetween(userId, startOfWeek, endOfWeek);
+        List<BurnoutStatusResponse> weeklyResponses = new ArrayList<>();
 
-        long totalWorkedMinutes = weeklyTasks.stream()
-                .filter(t -> t.getEndTime() != null && !t.isBreak())
-                .mapToLong(t -> Duration.between(t.getStartTime(), t.getEndTime()).toMinutes())
-                .sum();
+        for (int i = 6; i >= 0; i--) {
+            LocalDate targetDate = LocalDate.now().minusDays(i);
+            LocalDateTime startOfDay = targetDate.atStartOfDay();
+            LocalDateTime endOfDay = targetDate.atTime(LocalTime.MAX);
 
-        long totalBreakMinutes = weeklyTasks.stream()
-                .filter(TaskStatus::isBreak)
-                .mapToLong(t -> Duration.between(t.getStartTime(), t.getEndTime()).toMinutes())
-                .sum();
+            List<TaskStatus> dailyTasks = taskStatusRepository.findByUserIdAndStartTimeBetween(userId, startOfDay, endOfDay);
 
-        long nightWorkCount = weeklyTasks.stream()
-                .filter(t -> t.getStartTime() != null && t.getStartTime().getHour() >= 20)
-                .count();
+            long totalWorkedMinutes = dailyTasks.stream()
+                    .filter(t -> t.getEndTime() != null && !t.isBreak())
+                    .mapToLong(t -> Duration.between(t.getStartTime(), t.getEndTime()).toMinutes())
+                    .sum();
 
-        long shortTasks = weeklyTasks.stream()
-                .filter(t -> !t.isBreak())
-                .filter(t -> t.getStartTime() != null && t.getEndTime() != null)
-                .filter(t -> Duration.between(t.getStartTime(), t.getEndTime()).toMinutes() < 15)
-                .count();
+            long totalBreakMinutes = dailyTasks.stream()
+                    .filter(TaskStatus::isBreak)
+                    .mapToLong(t -> Duration.between(t.getStartTime(), t.getEndTime()).toMinutes())
+                    .sum();
 
-        int workloadPoint = (totalWorkedMinutes <= 2400) ? 0 : (totalWorkedMinutes <= 3000) ? 10 : 20;
-        int nightWorkPoint = (nightWorkCount == 0) ? 0 : (nightWorkCount <= 3) ? 10 : 20;
-        int contextSwitchPoint = shortTasks > 5 ? 20 : 0;
-        int breakPoint = totalBreakMinutes < 120 ? 20 : 0;
+            long nightWorkCount = dailyTasks.stream()
+                    .filter(t -> t.getStartTime() != null && t.getStartTime().getHour() >= 20)
+                    .count();
 
-        int score = workloadPoint + breakPoint + nightWorkPoint + contextSwitchPoint;
-        score = Math.min(score, 100);
+            long shortTasks = dailyTasks.stream()
+                    .filter(t -> !t.isBreak())
+                    .filter(t -> t.getStartTime() != null && t.getEndTime() != null)
+                    .filter(t -> Duration.between(t.getStartTime(), t.getEndTime()).toMinutes() < 15)
+                    .count();
 
-        String level = (score < 40) ? "Normal" : (score < 70 ? "Caution" : "High");
-        RecoveryRecommendationType recType = mapRiskLevelToRecovery(level);
+            int workloadPoint = (totalWorkedMinutes <= 480) ? 0 : (totalWorkedMinutes <= 600) ? 10 : 20;
+            int nightWorkPoint = (nightWorkCount == 0) ? 0 : (nightWorkCount <= 2) ? 10 : 20;
+            int contextSwitchPoint = shortTasks > 5 ? 20 : 0;
+            int breakPoint = totalBreakMinutes < 30 ? 20 : 0;
 
-        if (weeklyTasks.isEmpty()) {
-            return BurnoutStatusResponse.builder()
+            int score = workloadPoint + breakPoint + nightWorkPoint + contextSwitchPoint;
+            score = Math.min(score, 100);
+
+            String level = (score < 40) ? "Normal" : (score < 70 ? "Caution" : "High");
+            RecoveryRecommendationType recType = mapRiskLevelToRecovery(level);
+
+            BurnoutStatusResponse response = BurnoutStatusResponse.builder()
                     .userId(userId)
                     .userEmail(user.getEmail())
-                    .burnoutScore(0)
-                    .riskLevel("NoData")
-                    .recommendationMessage("No activity data found this week.")
+                    .date(targetDate)
+                    .burnoutScore(score)
+                    .riskLevel(level)
+                    .recommendationMessage(recType.getMessage())
                     .build();
+
+            weeklyResponses.add(response);
         }
 
-        BurnoutStatus status = BurnoutStatus.builder()
-                .userId(userId)
-                .burnoutScore(score)
-                .riskLevel(level)
-                .recommendationType(recType)
-                .calculatedDate(LocalDate.now())
-                .build();
-
-        burnoutStatusRepository.save(status);
-
-        return BurnoutStatusResponse.builder()
-                .userId(userId)
-                .userEmail(user.getEmail())
-                .burnoutScore(score)
-                .riskLevel(level)
-                .recommendationMessage(recType.getMessage())
-                .build();
+        return weeklyResponses;
     }
 
     private RecoveryRecommendationType mapRiskLevelToRecovery(String level) {
@@ -222,7 +212,6 @@ public class BurnoutCalculatorService {
             LocalDateTime startTime = workDay.atTime(9, 0);
             LocalDateTime endTime = workDay.atTime(18, 0);
 
-            // 하루 9시간 근무, 하루 1회 break
             weeklyTasks.add(TaskStatus.builder()
                     .userId(userId)
                     .startTime(startTime)

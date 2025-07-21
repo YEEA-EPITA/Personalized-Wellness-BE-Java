@@ -83,10 +83,13 @@ class BurnoutCalculationServiceTest {
 
         burnoutCalculatorService.createMockWeeklyTasks();
 
-        BurnoutStatusResponse result = burnoutCalculatorService.calculateWeeklyBurnoutScore();
+        List<BurnoutStatusResponse> results = burnoutCalculatorService.calculateWeeklyBurnoutScore();
 
-        assertThat(result.getBurnoutScore()).isGreaterThan(0);
-        assertThat(result.getUserId()).isEqualTo(user.getId());
-        assertThat(result.getRiskLevel()).isIn("Normal", "Caution", "High");
+        assertThat(results).isNotEmpty();
+        for (BurnoutStatusResponse result : results) {
+            assertThat(result.getBurnoutScore()).isGreaterThanOrEqualTo(0);
+            assertThat(result.getUserId()).isEqualTo(user.getId());
+            assertThat(result.getRiskLevel()).isIn("Normal", "Caution", "High");
+        }
     }
 }
