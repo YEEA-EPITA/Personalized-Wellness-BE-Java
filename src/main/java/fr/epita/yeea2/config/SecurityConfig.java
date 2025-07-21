@@ -47,7 +47,8 @@ public class SecurityConfig {
 //                        .requestMatchers("/jira/projects").permitAll() // for testing
 //                        .requestMatchers("/jira/**").authenticated()  // secure the rest of /jira/**
                         .requestMatchers("/api/profile/**").authenticated()
-                        .anyRequest().authenticated()
+                        .requestMatchers("/api/burnout/**").authenticated()
+                                .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .defaultSuccessUrl("/google/profile", true)
@@ -73,10 +74,6 @@ public class SecurityConfig {
                 // Customize the authentication entry point
                 .authenticationEntryPoint(new CustomAuthenticationEntryPoint()) // Sends 401 Unauthorized for any unauthenticated request
         ;
-        ;
-
-
-
         return http.build();
     }
 
