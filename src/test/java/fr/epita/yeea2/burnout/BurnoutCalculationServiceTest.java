@@ -1,5 +1,6 @@
 package fr.epita.yeea2.burnout;
 
+import fr.epita.yeea2.dto.BurnoutStatusDailyResponse;
 import fr.epita.yeea2.dto.BurnoutStatusResponse;
 import fr.epita.yeea2.entity.AppUser;
 import fr.epita.yeea2.entity.TaskStatus;
@@ -54,20 +55,25 @@ class BurnoutCalculationServiceTest {
         AppUser user = userRepository.findByEmail("test@email.com")
                 .orElseThrow(() -> new RuntimeException("Test user not found"));
 
-        // Mock today's task
         LocalDateTime now = LocalDateTime.now();
         taskStatusRepository.saveAll(List.of(
-                TaskStatus.builder().userId(user.getId()).startTime(now.minusHours(5)).endTime(now.minusHours(2)).isBreak(false).status("DONE").build(),
-                TaskStatus.builder().userId(user.getId()).startTime(now.minusMinutes(40)).endTime(now.minusMinutes(10)).isBreak(true).status("DONE").build()
+                TaskStatus.builder().userId(user.getId()).startTime(now.minusHours(4)).endTime(now.minusHours(1)).isBreak(false).status("DONE").build(),
+                TaskStatus.builder().userId(user.getId()).startTime(now.minusMinutes(40)).endTime(now.minusMinutes(10)).isBreak(true).status("DONE").build(),
+                TaskStatus.builder().userId(user.getId()).startTime(now.withHour(21)).endTime(now.withHour(22)).isBreak(false).status("DONE").build()
         ));
 
         // When
-        BurnoutStatusResponse result = burnoutCalculatorService.calculateDailyBurnoutScore();
+        BurnoutStatusDailyResponse result = burnoutCalculatorService.calculateDailyBurnoutScore();
 
         // Then
         assertThat(result.getBurnoutScore()).isGreaterThan(0);
         assertThat(result.getUserId()).isEqualTo(user.getId());
         assertThat(result.getRiskLevel()).isIn("Normal", "Caution", "High");
+        assertThat(result.getExtendedWorkSessions()).isIn(0, 20);
+        assertThat(result.getLackOfBreaks()).isIn(0, 10, 20);
+        assertThat(result.getNightWork()).isIn(0, 10, 20);
+        assertThat(result.getTodayWorkload()).isIn(0, 10, 20);
+        assertThat(result.getFrequentContextSwitching()).isIn(0, 20);
     }
 
     @Test
