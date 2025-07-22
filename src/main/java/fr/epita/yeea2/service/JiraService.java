@@ -47,6 +47,7 @@ public class JiraService {
     private final PlatformCredentialRepository platformCredentialRepository;
 
     private final JwtService jwtService;
+    private final BurnOutService burnOutService;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -525,7 +526,7 @@ public class JiraService {
         return null;
     }
 
-    public void updateIssueStatus(String issueKey, String newStatus, String accessToken, String cloudId) {
+    public void updateIssueStatus(String issueKey, String newStatus, String accessToken, String cloudId, String userId) {
         String transitionId = this.getTransitionId(issueKey, newStatus, accessToken, cloudId);
         if (transitionId == null) throw new RuntimeException("No transition found for status: " + newStatus);
 
@@ -538,8 +539,8 @@ public class JiraService {
         headers.setBearerAuth(accessToken);
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-
         restTemplate.postForEntity(url, entity, String.class);
+        burnOutService.changeTaskStatus(issueKey, newStatus, PlatformConstant.JIRA, userId);
     }
 
 

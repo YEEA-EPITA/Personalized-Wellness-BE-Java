@@ -2,7 +2,9 @@ package fr.epita.yeea2.controller;
 
 import fr.epita.yeea2.dto.*;
 import fr.epita.yeea2.entity.PlatformCredential;
+import fr.epita.yeea2.service.JwtService;
 import fr.epita.yeea2.service.TrelloService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +24,7 @@ import java.util.concurrent.ExecutionException;
 public class TrelloController {
 
     private final TrelloService trelloService;
+    private final JwtService jwtService;
 
     @Value("${platform.redirectUrl}")
     private String redirectUrl;
@@ -122,8 +125,24 @@ public class TrelloController {
     }
 
     @PutMapping("/card")
-    public ResponseEntity<?> updateCard(@RequestBody TrelloCardUpdateRequest request) {
-        return ResponseEntity.ok(trelloService.updateCard(request));
+    public ResponseEntity<?> updateCard(
+            HttpServletRequest httpServletRequest,
+            @RequestBody TrelloCardUpdateRequest request) {
+        final String authHeader = httpServletRequest.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            ApiResponse<?> errorResponse = new ApiResponse<>(
+                    401,
+                    HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+                    null
+            );
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Error updating Jira issue status", "error", errorResponse));
+
+        }
+
+        String token = authHeader.substring(7);
+        String userId = jwtService.extractUserId(token);
+        return ResponseEntity.ok(trelloService.updateCard(request,userId));
     }
 
     @PostMapping("/card/delete")

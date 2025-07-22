@@ -13,4 +13,5 @@ public class TrelloCardUpdateRequest {
     private String name;
     private String description;
     private String listId;
+    private boolean isListChanged;
 }

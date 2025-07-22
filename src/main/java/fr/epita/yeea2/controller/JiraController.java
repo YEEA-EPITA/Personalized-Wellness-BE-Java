@@ -3,7 +3,10 @@ package fr.epita.yeea2.controller;
 import fr.epita.yeea2.dto.*;
 import fr.epita.yeea2.entity.PlatformCredential;
 import fr.epita.yeea2.service.JiraService;
+import fr.epita.yeea2.service.JwtService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -16,6 +19,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/jira")
+@RequiredArgsConstructor
 public class JiraController {
 
     @Value("${jira.client-id}")
@@ -32,6 +36,8 @@ public class JiraController {
 
     @Autowired
     private JiraService jiraService;
+
+    private final JwtService jwtService;
 
 
 
@@ -139,7 +145,7 @@ public class JiraController {
     }
 
     @PostMapping("/status/update")
-    public ResponseEntity<Map<String, Object>> updateJiraStatus(@RequestBody JiraUpdateStatusRequest request) {
+    public ResponseEntity<Map<String, Object>> updateJiraStatus(HttpServletRequest httpServletRequest, @RequestBody JiraUpdateStatusRequest request) {
         // Retrieve the Jira credentials (platformCredential) from your database or authentication service
         PlatformCredential credential = jiraService.getJiraCredential(request.getJiraEmail());
         if (credential == null) {
@@ -149,10 +155,23 @@ public class JiraController {
 
         String cloudId = request.getCloudId();
         String accessToken = credential.getTokens().getAccessToken();
+        final String authHeader = httpServletRequest.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            ApiResponse<?> errorResponse = new ApiResponse<>(
+                    401,
+                    HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+                    null
+            );
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Error updating Jira issue status", "error", errorResponse));
 
+        }
+
+        String token = authHeader.substring(7);
+        String userId = jwtService.extractUserId(token);
         try {
             // Update the status of the Jira issue
-            jiraService.updateIssueStatus(request.getIssueKey(), request.getNewStatus(), accessToken, cloudId);
+            jiraService.updateIssueStatus(request.getIssueKey(), request.getNewStatus(), accessToken, cloudId, userId);
 
             return ResponseEntity.ok(Map.of("message", "Jira issue status updated successfully"));
         } catch (Exception e) {

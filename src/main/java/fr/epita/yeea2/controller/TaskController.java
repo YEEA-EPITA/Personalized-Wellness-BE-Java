@@ -2,8 +2,13 @@ package fr.epita.yeea2.controller;
 
 import fr.epita.yeea2.dto.ApiResponse;
 import fr.epita.yeea2.entity.Task;
+import fr.epita.yeea2.entity.WorkingHistory;
+import fr.epita.yeea2.service.BurnOutService;
+import fr.epita.yeea2.service.JwtService;
 import fr.epita.yeea2.service.TaskService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +20,26 @@ import java.util.List;
 public class TaskController {
 
     private final TaskService taskService;
+    private final JwtService jwtService;
+    private final BurnOutService burnOutService;
+
+    @GetMapping("/changeWorkingStatus")
+    public ResponseEntity<ApiResponse> changeWorkingStatus(HttpServletRequest request){
+        final String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            ApiResponse<?> errorResponse = new ApiResponse<>(
+                    401,
+                    HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+                    null
+            );
+            return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
+        }
+
+        String token = authHeader.substring(7);
+        String userId = jwtService.extractUserId(token);
+        WorkingHistory workingHistory = burnOutService.changeWorkingHistory(userId);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Working status changed successfully", workingHistory));
+    }
 
     @PostMapping
     public ResponseEntity<ApiResponse<Task>> createTask(@RequestBody Task task) {

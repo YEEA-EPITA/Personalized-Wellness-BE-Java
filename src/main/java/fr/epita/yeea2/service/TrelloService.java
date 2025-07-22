@@ -14,6 +14,7 @@ import fr.epita.yeea2.entity.PlatformCredential;
 import fr.epita.yeea2.repository.PlatformCredentialRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.apache.tomcat.util.bcel.Const;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -47,7 +48,7 @@ public class TrelloService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final JwtService jwtService;
     private final PlatformCredentialRepository platformCredentialRepository;
-
+    private final BurnOutService burnOutService;
 
     @PostConstruct
     public void init() {
@@ -461,7 +462,7 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
         }
     }
 
-    public Map<String, Object> updateCard(TrelloCardUpdateRequest request) {
+    public Map<String, Object> updateCard(TrelloCardUpdateRequest request, String userId) {
         PlatformCredential credential = this.getCredential(request.getTrelloEmail());
         OAuth1AccessToken token = buildToken(credential);
 
@@ -477,6 +478,7 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
             if (!response.isSuccessful()) {
                 throw new RuntimeException("Failed to update card: " + response.getMessage());
             }
+            burnOutService.changeTaskStatus(request.getCardId(),request.getListId(), PlatformConstant.TRELLO, userId);
             return objectMapper.readValue(response.getBody(), Map.class);
         } catch (Exception e) {
             throw new RuntimeException("Update card failed", e);
