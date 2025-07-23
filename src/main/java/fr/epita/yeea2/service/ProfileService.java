@@ -3,6 +3,8 @@ package fr.epita.yeea2.service;
 import fr.epita.yeea2.dto.ProfileRequest;
 import fr.epita.yeea2.dto.ProfileResponse;
 import fr.epita.yeea2.entity.AppUser;
+import fr.epita.yeea2.entity.PlatformCredential;
+import fr.epita.yeea2.repository.PlatformCredentialRepository;
 import fr.epita.yeea2.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -15,17 +17,22 @@ import java.util.Optional;
 public class ProfileService {
 
     private final UserRepository userRepository;
+    private final PlatformCredentialRepository platformCredentialRepository;
     private final PasswordEncoder passwordEncoder;
 
     public ProfileResponse getUserInfo(String email) {
         AppUser user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        PlatformCredential platformCredential = platformCredentialRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Platform credential not found"));
+
         return ProfileResponse.builder()
                 .email(Optional.ofNullable(user.getEmail()).orElse(""))
                 .firstName(Optional.ofNullable(user.getFirstName()).orElse(""))
                 .lastName(Optional.ofNullable(user.getLastName()).orElse(""))
                 .provider(Optional.ofNullable(user.getProvider()).orElse(""))
+                .createdAt(Optional.of(platformCredential.getCreatedAt().toString()).orElse(""))
                 .build();
     }
 

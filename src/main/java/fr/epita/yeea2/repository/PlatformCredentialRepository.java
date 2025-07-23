@@ -10,4 +10,6 @@ import java.util.Optional;
 public interface PlatformCredentialRepository extends MongoRepository<PlatformCredential, String> {
 
     Optional<PlatformCredential> findByPlatformEmailAndTypeAndConnectorId(String email, String type, Object connectorId);
+
+    Optional<PlatformCredential> findByEmail(String email);
 }

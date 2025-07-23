@@ -11,4 +11,5 @@ public class ProfileResponse {
     private String firstName;
     private String lastName;
     private String provider;
+    private String createdAt;
 }
