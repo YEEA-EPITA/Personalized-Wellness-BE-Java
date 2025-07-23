@@ -34,7 +34,7 @@ public class ProfileController {
         }
     }
 
-    @DeleteMapping("/me")
+    @PutMapping("/me/delete")
     public ResponseEntity<GeneralResponse> deleteUser(@RequestBody(required = false) ProfileDeleteRequest request) {
         String email = getEmailFromSecurityContext();
 
