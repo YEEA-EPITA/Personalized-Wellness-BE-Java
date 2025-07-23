@@ -1,5 +1,6 @@
 package fr.epita.yeea2.entity;
 
+import fr.epita.yeea2.dto.ProfileRequest;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -28,4 +29,10 @@ public class AppUser {
     private String password; // hashed!
     private List<String> roles;
     private String provider;
+
+    public void updateFromRequest(ProfileRequest req) {
+        this.firstName = req.getFirstName();
+        this.lastName = req.getLastName();
+        this.email = req.getEmail();
+    }
 }
