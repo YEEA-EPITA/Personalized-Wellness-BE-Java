@@ -67,8 +67,8 @@ public class JiraService {
 
 
 
-    public List<JiraProjectResponse> getProjects(String jiraEmai) {
-        PlatformCredential credential = platformCredentialRepository.findByPlatformEmailAndType(jiraEmai, PlatformConstant.JIRA).orElse(null);
+    public List<JiraProjectResponse> getProjects(String jiraEmai, String userId) {
+        PlatformCredential credential = platformCredentialRepository.findByPlatformEmailAndTypeAndConnectorId(jiraEmai, PlatformConstant.JIRA, new ObjectId(userId)).orElse(null);
         if (credential != null) {
             RestTemplate restTemplate = new RestTemplate();
 
@@ -244,7 +244,7 @@ public class JiraService {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .build();
-        PlatformCredential savedCredential = platformCredentialRepository.findByPlatformEmailAndType(jiraEmail, PlatformConstant.JIRA).map(existing -> {
+        PlatformCredential savedCredential = platformCredentialRepository.findByPlatformEmailAndTypeAndConnectorId(jiraEmail, PlatformConstant.JIRA, new ObjectId(userId)).map(existing -> {
             existing.setTokens(token);
             existing.setUpdatedAt(Instant.now());
             return platformCredentialRepository.save(existing);
@@ -266,9 +266,9 @@ public class JiraService {
         return savedCredential;
     }
 
-    public List<JiraTaskResponse> getTaskDetailsFromProject(JiraIssueGetRequest request) {
+    public List<JiraTaskResponse> getTaskDetailsFromProject(JiraIssueGetRequest request, String userId) {
         try {
-            PlatformCredential credential = platformCredentialRepository.findByPlatformEmailAndType(request.getJiraEmail(), PlatformConstant.JIRA).orElse(null);
+            PlatformCredential credential = platformCredentialRepository.findByPlatformEmailAndTypeAndConnectorId(request.getJiraEmail(), PlatformConstant.JIRA, new ObjectId(userId)).orElse(null);
             if (credential != null) {
                 RestTemplate restTemplate = new RestTemplate();
 
@@ -303,7 +303,7 @@ public class JiraService {
                     if (response.getStatusCode().is2xxSuccessful()) {
                         List<Map<String, Object>> rawIssues = (List<Map<String, Object>>) response.getBody().get("issues");
                         List<JiraTaskResponse> simplifiedIssues = rawIssues.stream()
-                                .map(i -> this.simplifyTask(i,cloudId)
+                                .map(i -> this.simplifyTask(i,cloudId,userId)
                                 )
                                 .collect(Collectors.toList());
                         issues.addAll(simplifiedIssues);
@@ -351,7 +351,7 @@ public class JiraService {
         );
     }
 
-    private JiraTaskResponse simplifyTask(Map<String, Object> issue, String cloudId) {
+    private JiraTaskResponse simplifyTask(Map<String, Object> issue, String cloudId, String userId) {
         Map<String, Object> fields = (Map<String, Object>) issue.get(JiraConstant.JiraField.FIELDS);
 
         String summary = (String) fields.get(fr.epita.yeea2.constant.PlatformConstant.JiraConstant.JiraField.SUMMARY);
@@ -406,9 +406,10 @@ public class JiraService {
                 .cloudId(cloudId)
                 .assignedBy(assignedByResponse)
                 .build();    }
-    public PlatformCredential getJiraCredential(String jiraEmail) {
+
+    public PlatformCredential getJiraCredential(String jiraEmail, String userId) {
         return platformCredentialRepository
-                .findByPlatformEmailAndType(jiraEmail, PlatformConstant.JIRA)
+                .findByPlatformEmailAndTypeAndConnectorId(jiraEmail, PlatformConstant.JIRA, new ObjectId(userId))
                 .orElse(null);
     }
 
@@ -421,8 +422,8 @@ public class JiraService {
         return null;
     }
 
-    public Map<String, Object> createJiraTask(JiraCreateTaskRequest request) {
-        PlatformCredential credential = this.getJiraCredential(request.getJiraEmail());
+    public Map<String, Object> createJiraTask(JiraCreateTaskRequest request, String userId) {
+        PlatformCredential credential = this.getJiraCredential(request.getJiraEmail(), userId);
         if (credential == null) return null;
 
         String cloudId = request.getCloudId();
@@ -444,8 +445,8 @@ public class JiraService {
         return response.getBody();
     }
 
-    public Map<String, Object> updateJiraTask(JiraUpdateTaskRequest request) {
-        PlatformCredential credential = this.getJiraCredential(request.getJiraEmail());
+    public Map<String, Object> updateJiraTask(JiraUpdateTaskRequest request, String userId) {
+        PlatformCredential credential = this.getJiraCredential(request.getJiraEmail(), userId);
         if (credential == null) return null;
 
         String cloudId = request.getCloudId();
@@ -491,8 +492,8 @@ public class JiraService {
     }
 
 
-    public void deleteJiraTask(String jiraEmail, String issueKey) {
-        PlatformCredential credential = getJiraCredential(jiraEmail);
+    public void deleteJiraTask(String jiraEmail, String issueKey, String userId) {
+        PlatformCredential credential = getJiraCredential(jiraEmail, userId);
         if (credential == null) return;
 
         String cloudId = credential.getPlatformCloudIds().get(0);

@@ -4,6 +4,7 @@ import fr.epita.yeea2.dto.*;
 import fr.epita.yeea2.entity.PlatformCredential;
 import fr.epita.yeea2.service.JwtService;
 import fr.epita.yeea2.service.TrelloService;
+import fr.epita.yeea2.service.Utils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class TrelloController {
 
     private final TrelloService trelloService;
     private final JwtService jwtService;
+    private final Utils utils;
 
     @Value("${platform.redirectUrl}")
     private String redirectUrl;
@@ -69,9 +71,11 @@ public class TrelloController {
     }
 
     @GetMapping("/boards")
-    public ResponseEntity<?> getBoards(@RequestParam String trelloEmail) {
+    public ResponseEntity<?> getBoards(@RequestParam String trelloEmail,
+                                       HttpServletRequest httpServletRequest) {
         try {
-            List<Map<String, Object>> boards = trelloService.getBoards(trelloEmail);
+            String userId = utils.getUserIdFromHeader(httpServletRequest);
+            List<Map<String, Object>> boards = trelloService.getBoards(trelloEmail, userId);
             ApiResponse<List<Map<String, Object>>> response = new ApiResponse<>(200, "Boards fetched successfully", boards);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -83,9 +87,10 @@ public class TrelloController {
     }
 
     @PostMapping("/lists")
-    public ResponseEntity<?> getListsFromBoards(@RequestBody TrelloListOrCardGetRequest request) {
+    public ResponseEntity<?> getListsFromBoards(@RequestBody TrelloListOrCardGetRequest request, HttpServletRequest httpServletRequest) {
         try {
-            Map<String, List<Map<String, Object>>> result = trelloService.getListsFromBoards(request);
+            String userId = utils.getUserIdFromHeader(httpServletRequest);
+            Map<String, List<Map<String, Object>>> result = trelloService.getListsFromBoards(request, userId);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Failed to fetch lists", "details", e.getMessage()));
@@ -94,7 +99,7 @@ public class TrelloController {
 
 
     @PostMapping("/cards/from-lists")
-    public ResponseEntity<?> getCardsFromListIds(@RequestBody TrelloListOrCardGetRequest request) {
+    public ResponseEntity<?> getCardsFromListIds(@RequestBody TrelloListOrCardGetRequest request, HttpServletRequest httpServletRequest) {
         if (request.getTrelloEmail() == null || request.getListIds() == null || request.getListIds().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of(
                     "error", "trelloEmail and listIds are required"
@@ -102,7 +107,8 @@ public class TrelloController {
         }
 
         try {
-            List<TrelloCardResponse> cards = trelloService.getCardsFromListIds(request);
+            String userId = utils.getUserIdFromHeader(httpServletRequest);
+            List<TrelloCardResponse> cards = trelloService.getCardsFromListIds(request, userId);
             ApiResponse<List<TrelloCardResponse>> response = new ApiResponse<>(
                     HttpStatus.OK.value(),
                     "Retrieved cards successfully",
@@ -120,8 +126,10 @@ public class TrelloController {
     }
 
     @PostMapping("/card")
-    public ResponseEntity<?> createCard(@RequestBody TrelloCardCreateRequest request) {
-        return ResponseEntity.ok(trelloService.createCard(request));
+    public ResponseEntity<?> createCard(@RequestBody TrelloCardCreateRequest request,
+                                        HttpServletRequest httpServletRequest) {
+        String userId = utils.getUserIdFromHeader(httpServletRequest);
+        return ResponseEntity.ok(trelloService.createCard(request,userId));
     }
 
     @PutMapping("/card")
@@ -146,8 +154,10 @@ public class TrelloController {
     }
 
     @PostMapping("/card/delete")
-    public ResponseEntity<?> deleteCard(@RequestBody TrelloCardDeleteRequest request) {
-        boolean deleted = trelloService.deleteCard(request.getTrelloEmail(), request.getCardId());
+    public ResponseEntity<?> deleteCard(@RequestBody TrelloCardDeleteRequest request,
+                                        HttpServletRequest httpServletRequest) {
+        String userId = utils.getUserIdFromHeader(httpServletRequest);
+        boolean deleted = trelloService.deleteCard(request.getTrelloEmail(), request.getCardId(), userId);
         return ResponseEntity.ok(Map.of("deleted", deleted));
     }
 

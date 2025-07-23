@@ -4,6 +4,7 @@ import fr.epita.yeea2.dto.*;
 import fr.epita.yeea2.entity.PlatformCredential;
 import fr.epita.yeea2.service.JiraService;
 import fr.epita.yeea2.service.JwtService;
+import fr.epita.yeea2.service.Utils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +39,7 @@ public class JiraController {
     private JiraService jiraService;
 
     private final JwtService jwtService;
-
+    private final Utils utils;
 
 
     @GetMapping("/check-auth")
@@ -81,17 +82,17 @@ public class JiraController {
             @RequestParam String state,
             HttpServletResponse response
     ) throws IOException {
-        PlatformCredential credential = jiraService.exchangeCodeForTokens(code, state);
-
-//        String systemToken = new String(Base64.getUrlDecoder().decode(state), StandardCharsets.UTF_8);
-//        String redirectUrl = successfulRedirectUrl;
+        jiraService.exchangeCodeForTokens(code, state);
         response.sendRedirect(successfulRedirectUrl);
     }
 
     @GetMapping("/projects")
-    public ResponseEntity<?> getJiraProjects(@RequestParam String jiraEmail) {
+    public ResponseEntity<?> getJiraProjects(@RequestParam String jiraEmail,
+                                             HttpServletRequest httpServletRequest) {
         try {
-            List<JiraProjectResponse> projects = jiraService.getProjects(jiraEmail);
+            String userId = utils.getUserIdFromHeader(httpServletRequest);
+            List<JiraProjectResponse> projects = jiraService.getProjects(jiraEmail, userId);
+
             ApiResponse<List<JiraProjectResponse>> response = new ApiResponse<>(200, "Login successful", projects);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -103,13 +104,15 @@ public class JiraController {
     }
 
     @PostMapping("/tasks")
-    public ResponseEntity<?> getTasksByProject(@RequestBody JiraIssueGetRequest request) {
+    public ResponseEntity<?> getTasksByProject(@RequestBody JiraIssueGetRequest request,
+                                               HttpServletRequest httpServletRequest) {
 
         if (request.getJiraEmail() == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "jiraEmail is required."));
         }
+        String userId = utils.getUserIdFromHeader(httpServletRequest);
         try {
-            List<JiraTaskResponse> tasks = jiraService.getTaskDetailsFromProject(request);
+            List<JiraTaskResponse> tasks = jiraService.getTaskDetailsFromProject(request,userId);
             ApiResponse<List<JiraTaskResponse>> response = new ApiResponse<>(HttpStatus.OK.value(),"Retrieve tasks successfully", tasks);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -119,9 +122,11 @@ public class JiraController {
     }
 
     @PostMapping("/task/create")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> createTask(@RequestBody JiraCreateTaskRequest request) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createTask(@RequestBody JiraCreateTaskRequest request,
+                                                                       HttpServletRequest httpServletRequest) {
         try {
-            Map<String, Object> createdTask = jiraService.createJiraTask(request);
+            String userId = utils.getUserIdFromHeader(httpServletRequest);
+            Map<String, Object> createdTask = jiraService.createJiraTask(request, userId);
             ApiResponse<Map<String, Object>> response = new ApiResponse<>(200, "Task created successfully", createdTask);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -131,10 +136,12 @@ public class JiraController {
     }
 
     @PutMapping("/task/update")
-    public ResponseEntity<ApiResponse<String>> updateTask(@RequestBody JiraUpdateTaskRequest request) {
+    public ResponseEntity<ApiResponse<String>> updateTask(@RequestBody JiraUpdateTaskRequest request,
+                                                          HttpServletRequest httpServletRequest) {
         try {
+            String userId = utils.getUserIdFromHeader(httpServletRequest);
             jiraService.updateJiraTask(
-                    request
+                    request, userId
             );
             ApiResponse<String> response = new ApiResponse<>(200, "Task updated successfully", null);
             return ResponseEntity.ok(response);
@@ -147,7 +154,8 @@ public class JiraController {
     @PostMapping("/status/update")
     public ResponseEntity<Map<String, Object>> updateJiraStatus(HttpServletRequest httpServletRequest, @RequestBody JiraUpdateStatusRequest request) {
         // Retrieve the Jira credentials (platformCredential) from your database or authentication service
-        PlatformCredential credential = jiraService.getJiraCredential(request.getJiraEmail());
+        String userId = utils.getUserIdFromHeader(httpServletRequest);
+        PlatformCredential credential = jiraService.getJiraCredential(request.getJiraEmail(),userId);
         if (credential == null) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", "Invalid Jira credentials"));
@@ -155,20 +163,7 @@ public class JiraController {
 
         String cloudId = request.getCloudId();
         String accessToken = credential.getTokens().getAccessToken();
-        final String authHeader = httpServletRequest.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            ApiResponse<?> errorResponse = new ApiResponse<>(
-                    401,
-                    HttpStatus.UNAUTHORIZED.getReasonPhrase(),
-                    null
-            );
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Error updating Jira issue status", "error", errorResponse));
 
-        }
-
-        String token = authHeader.substring(7);
-        String userId = jwtService.extractUserId(token);
         try {
             // Update the status of the Jira issue
             jiraService.updateIssueStatus(request.getIssueKey(), request.getNewStatus(), accessToken, cloudId, userId);
@@ -181,9 +176,11 @@ public class JiraController {
     }
 
     @PostMapping("/task/delete")
-    public ResponseEntity<ApiResponse<String>> deleteTask(@RequestBody JiraDeleteIssueRequest request) {
+    public ResponseEntity<ApiResponse<String>> deleteTask(@RequestBody JiraDeleteIssueRequest request,
+                                                          HttpServletRequest httpServletRequest) {
         try {
-            jiraService.deleteJiraTask(request.getJiraEmail(), request.getIssueKey());
+            String userId = utils.getUserIdFromHeader(httpServletRequest);
+            jiraService.deleteJiraTask(request.getJiraEmail(), request.getIssueKey(), userId);
             ApiResponse<String> response = new ApiResponse<>(200, "Task deleted successfully", null);
             return ResponseEntity.ok(response);
         } catch (Exception e) {

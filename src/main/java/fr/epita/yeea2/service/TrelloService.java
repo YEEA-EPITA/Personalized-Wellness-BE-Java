@@ -14,7 +14,6 @@ import fr.epita.yeea2.entity.PlatformCredential;
 import fr.epita.yeea2.repository.PlatformCredentialRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
-import org.apache.tomcat.util.bcel.Const;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -130,7 +129,7 @@ public class TrelloService {
                 .accessTokenSecret(accessToken.getTokenSecret())
                 .build();
 
-        return platformCredentialRepository.findByPlatformEmailAndType(trelloEmail, PlatformConstant.TRELLO)
+        return platformCredentialRepository.findByPlatformEmailAndTypeAndConnectorId(trelloEmail, PlatformConstant.TRELLO, userId)
                 .map(existing -> {
                     existing.setTokens(token);
                     existing.setUpdatedAt(Instant.now());
@@ -165,10 +164,10 @@ public class TrelloService {
         return new ObjectMapper().readValue(response.getBody(), Map.class); // Jackson
     }
 
-    public List<Map<String, Object>> getBoards(String trelloEmail) {
+    public List<Map<String, Object>> getBoards(String trelloEmail, String userId) {
         // 1. Get Trello access token from database
         PlatformCredential credential = platformCredentialRepository
-                .findByPlatformEmailAndType(trelloEmail, PlatformConstant.TRELLO)
+                .findByPlatformEmailAndTypeAndConnectorId(trelloEmail, PlatformConstant.TRELLO, new ObjectId(userId))
                 .orElseThrow(() -> new RuntimeException("Trello credentials not found for: " + trelloEmail));
 
         String accessToken = credential.getTokens().getAccessToken();
@@ -307,9 +306,9 @@ public class TrelloService {
 //
 //        return allCards;
 //    }
-public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest request) {
+public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest request, String userId) {
     PlatformCredential credential = platformCredentialRepository
-            .findByPlatformEmailAndType(request.getTrelloEmail(), PlatformConstant.TRELLO)
+            .findByPlatformEmailAndTypeAndConnectorId(request.getTrelloEmail(), PlatformConstant.TRELLO, new ObjectId(userId))
             .orElseThrow(() -> new RuntimeException("Trello credentials not found"));
 
     OAuth1AccessToken token = new OAuth1AccessToken(
@@ -368,9 +367,9 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
     return allCards;
 }
 
-    public Map<String, Object> createCardInBoard(String listId, String trelloEmail, String cardName, String cardDesc) {
+    public Map<String, Object> createCardInBoard(String listId, String trelloEmail, String cardName, String cardDesc, String userId) {
         PlatformCredential credential = platformCredentialRepository
-                .findByPlatformEmailAndType(trelloEmail, PlatformConstant.TRELLO)
+                .findByPlatformEmailAndTypeAndConnectorId(trelloEmail, PlatformConstant.TRELLO, userId)
                 .orElseThrow(() -> new RuntimeException("Trello credentials not found"));
 
         OAuth1AccessToken token = new OAuth1AccessToken(
@@ -399,9 +398,9 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
         }
     }
 
-    public Map<String, List<Map<String, Object>>> getListsFromBoards(TrelloListOrCardGetRequest request) {
+    public Map<String, List<Map<String, Object>>> getListsFromBoards(TrelloListOrCardGetRequest request, String userId) {
         PlatformCredential credential = platformCredentialRepository
-                .findByPlatformEmailAndType(request.getTrelloEmail(), PlatformConstant.TRELLO)
+                .findByPlatformEmailAndTypeAndConnectorId(request.getTrelloEmail(), PlatformConstant.TRELLO, new ObjectId(userId))
                 .orElseThrow(() -> new RuntimeException("Trello credentials not found"));
 
         OAuth1AccessToken token = new OAuth1AccessToken(
@@ -440,8 +439,8 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
         return boardListsMap;
     }
 
-    public Map<String, Object> createCard(TrelloCardCreateRequest request) {
-        PlatformCredential credential = this.getCredential(request.getTrelloEmail());
+    public Map<String, Object> createCard(TrelloCardCreateRequest request, String userId) {
+        PlatformCredential credential = this.getCredential(request.getTrelloEmail(), userId);
         OAuth1AccessToken token = buildToken(credential);
 
         OAuthRequest cardRequest = new OAuthRequest(Verb.POST, PlatformConstant.TrelloConstant.LIST_CARDS_NO_QUERY);
@@ -463,7 +462,7 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
     }
 
     public Map<String, Object> updateCard(TrelloCardUpdateRequest request, String userId) {
-        PlatformCredential credential = this.getCredential(request.getTrelloEmail());
+        PlatformCredential credential = this.getCredential(request.getTrelloEmail(), userId);
         OAuth1AccessToken token = buildToken(credential);
 
         String url = PlatformConstant.TrelloConstant.LIST_CARDS_NO_QUERY + "/" + request.getCardId();
@@ -485,8 +484,8 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
         }
     }
 
-    public boolean deleteCard(String trelloEmail, String cardId) {
-        PlatformCredential credential = this.getCredential(trelloEmail);
+    public boolean deleteCard(String trelloEmail, String cardId, String userId) {
+        PlatformCredential credential = this.getCredential(trelloEmail, userId);
         OAuth1AccessToken token = buildToken(credential);
 
         String url = PlatformConstant.TrelloConstant.LIST_CARDS_NO_QUERY + "/" + cardId;
@@ -505,8 +504,8 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
         }
     }
 
-    private PlatformCredential getCredential(String trelloEmail) {
-        return platformCredentialRepository.findByPlatformEmailAndType(trelloEmail, PlatformConstant.TRELLO)
+    private PlatformCredential getCredential(String trelloEmail, String userId) {
+        return platformCredentialRepository.findByPlatformEmailAndTypeAndConnectorId(trelloEmail, PlatformConstant.TRELLO, new ObjectId(userId))
                 .orElseThrow(() -> new RuntimeException("Trello credentials not found"));
     }
 
