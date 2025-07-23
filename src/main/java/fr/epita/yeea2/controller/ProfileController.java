@@ -23,14 +23,14 @@ public class ProfileController {
     }
 
     @PutMapping("/me")
-    public ResponseEntity<GeneralResponse> updateUser(@RequestBody ProfileRequest request) {
+    public ResponseEntity<ApiResponse<ProfileResponse>> updateUser(@RequestBody ProfileRequest request) {
         String email = getEmailFromSecurityContext();
 
         try {
-            profileService.updateUserInfo(email, request);
-            return ResponseEntity.ok(new GeneralResponse(200, "Your profile has been successfully updated."));
+            ProfileResponse response = profileService.updateUserInfo(email, request);
+            return ResponseEntity.ok(new ApiResponse<>(200, "Your profile has been successfully updated.", response));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(new GeneralResponse(400, e.getMessage()));
+            return ResponseEntity.badRequest().body(new ApiResponse<>(400, e.getMessage(), null));
         }
     }
 

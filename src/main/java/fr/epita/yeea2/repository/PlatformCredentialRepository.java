@@ -15,5 +15,5 @@ public interface PlatformCredentialRepository extends MongoRepository<PlatformCr
 
     Optional<List<PlatformCredential>> findAllByEmail(String email);
 
-    void deleteAllByConnectorId(String connectorId);
+    void deleteAllByConnectorId(Object connectorId);
 }

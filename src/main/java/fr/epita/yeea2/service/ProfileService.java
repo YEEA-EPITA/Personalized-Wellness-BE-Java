@@ -37,7 +37,7 @@ public class ProfileService {
                 .build();
     }
 
-    public void updateUserInfo(String email, ProfileRequest request) {
+    public ProfileResponse updateUserInfo(String email, ProfileRequest request) {
         AppUser user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -55,16 +55,22 @@ public class ProfileService {
 
         user.updateFromRequest(request);
         userRepository.save(user);
+
+        return ProfileResponse.builder()
+                .email(Optional.ofNullable(user.getEmail()).orElse(""))
+                .firstName(Optional.ofNullable(user.getFirstName()).orElse(""))
+                .lastName(Optional.ofNullable(user.getLastName()).orElse(""))
+                .provider(Optional.ofNullable(user.getProvider()).orElse(""))
+                .createdAt(Optional.of(user.getCreatedAt().toString()).orElse(""))
+                .build();
     }
 
     public void deleteUser(String email, String password) {
         AppUser user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        List<PlatformCredential> credentials = platformCredentialRepository.findAllByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Platform credentials not found"));
-
         if ("GOOGLE".equals(user.getProvider())) {
+            platformCredentialRepository.deleteAllByConnectorId(new ObjectId(user.getId()));
             userRepository.delete(user);
             return;
         }
@@ -73,8 +79,7 @@ public class ProfileService {
             throw new IllegalArgumentException("The password does not match.");
         }
 
-        platformCredentialRepository.deleteAllByConnectorId(user.getId());
-
+        platformCredentialRepository.deleteAllByConnectorId(new ObjectId(user.getId()));
         userRepository.delete(user);
     }
 
