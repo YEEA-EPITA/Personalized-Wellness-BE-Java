@@ -2,11 +2,13 @@ package fr.epita.yeea2.entity;
 
 import fr.epita.yeea2.dto.ProfileRequest;
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
+import java.time.Instant;
 import java.util.List;
 
 @Getter
@@ -29,6 +31,8 @@ public class AppUser {
     private String password; // hashed!
     private List<String> roles;
     private String provider;
+    @CreatedDate
+    private Instant createdAt;
 
     public void updateFromRequest(ProfileRequest req) {
         this.firstName = req.getFirstName();

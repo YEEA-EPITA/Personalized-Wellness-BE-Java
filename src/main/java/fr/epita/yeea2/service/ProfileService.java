@@ -17,22 +17,18 @@ import java.util.Optional;
 public class ProfileService {
 
     private final UserRepository userRepository;
-    private final PlatformCredentialRepository platformCredentialRepository;
     private final PasswordEncoder passwordEncoder;
 
     public ProfileResponse getUserInfo(String email) {
         AppUser user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        PlatformCredential platformCredential = platformCredentialRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Platform credential not found"));
-
         return ProfileResponse.builder()
                 .email(Optional.ofNullable(user.getEmail()).orElse(""))
                 .firstName(Optional.ofNullable(user.getFirstName()).orElse(""))
                 .lastName(Optional.ofNullable(user.getLastName()).orElse(""))
                 .provider(Optional.ofNullable(user.getProvider()).orElse(""))
-                .createdAt(Optional.of(platformCredential.getCreatedAt().toString()).orElse(""))
+                .createdAt(Optional.ofNullable(user.getCreatedAt().toString()).orElse(""))
                 .build();
     }
 
@@ -60,7 +56,6 @@ public class ProfileService {
         userRepository.save(user);
     }
 
-    // TODO: Soft delete
     public void deleteUser(String email, String password) {
         AppUser user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
