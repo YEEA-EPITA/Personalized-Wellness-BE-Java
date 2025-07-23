@@ -41,6 +41,14 @@ public class ProfileService {
             throw new IllegalArgumentException("The password does not match.");
         }
 
+        String newEmail = request.getEmail();
+        if (!user.getEmail().equals(newEmail)) {
+            boolean emailExists = userRepository.findByEmail(newEmail).isPresent();
+            if (emailExists) {
+                throw new IllegalArgumentException("The new email is already in use.");
+            }
+        }
+
         user.updateFromRequest(request);
         userRepository.save(user);
     }
