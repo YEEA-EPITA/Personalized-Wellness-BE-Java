@@ -25,12 +25,12 @@ jobs:
         env:
           allowedOrigins: "*"
 
-      - name: Print test failure reports
-        if: failure()
-        run: |
-          echo "::group::Surefire Reports"
-          cat target/surefire-reports/*.txt || true
-          echo "::endgroup::"
+#      - name: Print test failure reports
+#        if: failure()
+#        run: |
+#          echo "::group::Surefire Reports"
+#          cat target/surefire-reports/*.txt || true
+#          echo "::endgroup::"
 
       - name: Build with Maven
         run: ./mvnw clean package -DskipTests
