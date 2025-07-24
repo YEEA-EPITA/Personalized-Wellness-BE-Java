@@ -20,8 +20,11 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build with Maven
-        run: ./mvnw clean package -DskipTests
+#      - name: Build with Maven
+#        run: ./mvnw clean package -DskipTests
+
+      - name: Build and test with Maven
+        run: ./mvnw clean verify
 
       - name: Log in to DockerHub
         uses: docker/login-action@v3
