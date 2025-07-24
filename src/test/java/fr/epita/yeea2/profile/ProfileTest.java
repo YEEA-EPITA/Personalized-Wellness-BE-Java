@@ -33,8 +33,6 @@ class ProfileTest {
 
     @BeforeEach
     void setUp() {
-//        userRepository.deleteAll();
-
         AppUser user = AppUser.builder()
                 .email(email)
                 .password(passwordEncoder.encode(password))
@@ -81,7 +79,6 @@ class ProfileTest {
     @Test
     @WithMockUser(username = "testuser@example.com", roles = "USER")
     void updateUserProfile_shouldFail_whenEmailAlreadyExists() throws Exception {
-        // 중복 이메일 등록
         userRepository.save(AppUser.builder()
                 .email("existing@example.com")
                 .password(passwordEncoder.encode("another"))
