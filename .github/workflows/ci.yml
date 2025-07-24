@@ -20,11 +20,20 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-#      - name: Build with Maven
-#        run: ./mvnw clean package -DskipTests
+      - name: Run tests with Maven
+        run: ./mvnw test
+        env:
+          allowedOrigins: "*"
 
-      - name: Build and test with Maven
-        run: ./mvnw clean verify
+      - name: Print test failure reports
+        if: failure()
+        run: |
+          echo "::group::Surefire Reports"
+          cat target/surefire-reports/*.txt || true
+          echo "::endgroup::"
+
+      - name: Build with Maven
+        run: ./mvnw clean package -DskipTests
 
       - name: Log in to DockerHub
         uses: docker/login-action@v3
