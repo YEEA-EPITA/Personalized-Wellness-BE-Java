@@ -34,3 +34,9 @@ build/
 
 # Ignore application.properties
 application.properties
+
+target/
+.git
+.idea
+*.iml
+*.log
