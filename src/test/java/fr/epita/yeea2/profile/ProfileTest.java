@@ -33,8 +33,6 @@ class ProfileTest {
 
     @BeforeEach
     void setUp() {
-        userRepository.deleteAll();
-
         AppUser user = AppUser.builder()
                 .email(email)
                 .password(passwordEncoder.encode(password))
