@@ -9,6 +9,7 @@ import java.time.LocalDate;
 @Builder
 public class BurnoutStatusDailyResponse {
     private String userId;
+    private String day;
     private String userEmail;
     private int burnoutScore;
     private String riskLevel;

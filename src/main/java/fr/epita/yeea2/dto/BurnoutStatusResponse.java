@@ -12,7 +12,7 @@ import java.time.LocalDate;
 public class BurnoutStatusResponse {
     private String userId;
     private String userEmail;
-    private LocalDate date;
+    private String day;
     private int burnoutScore;
     private String riskLevel;
 

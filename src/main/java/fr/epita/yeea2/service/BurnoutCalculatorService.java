@@ -2,12 +2,14 @@ package fr.epita.yeea2.service;
 
 import fr.epita.yeea2.dto.BurnoutStatusDailyResponse;
 import fr.epita.yeea2.dto.BurnoutStatusResponse;
+import fr.epita.yeea2.dto.SumarizationDto;
 import fr.epita.yeea2.entity.AppUser;
 import fr.epita.yeea2.entity.RecoveryRecommendationType;
 import fr.epita.yeea2.entity.TaskStatus;
-import fr.epita.yeea2.repository.BurnoutStatusRepository;
+import fr.epita.yeea2.entity.WorkingHistory;
 import fr.epita.yeea2.repository.TaskStatusRepository;
 import fr.epita.yeea2.repository.UserRepository;
+import fr.epita.yeea2.repository.WorkingHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -24,9 +26,108 @@ import java.util.List;
 public class BurnoutCalculatorService {
     private final UserRepository userRepository;
     private final TaskStatusRepository taskStatusRepository;
-    private final BurnoutStatusRepository burnoutStatusRepository;
+    private final WorkingHistoryRepository workingHistoryRepository;
 
     public BurnoutStatusDailyResponse calculateDailyBurnoutScore() {
+        String email = getEmailFromSecurityContext();
+        AppUser user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        String userId = user.getId();
+        String today = LocalDate.now().toString();
+
+        WorkingHistory workingHistory = workingHistoryRepository.findByUserIdAndDay(userId, today)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No working history for today"));
+
+        if (workingHistory == null || workingHistory.getSumarization() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No working history for today");
+        }
+
+        var sum = workingHistory.getSumarization();
+
+        int extendedWorkSessionsPoint = (sum.getWorkingDuration() >= 3 * 60 * 60 * 1000L) ? 20 : 0;
+        int lackOfBreaksPoint = (sum.getNumberOfBreaks() == 0) ? 20 : (sum.getNumberOfBreaks() == 1 ? 10 : 0);
+        int nightWorkPoint = 0;
+        int todayWorkloadPoint = (sum.getWorkingDuration() <= 480 * 60 * 1000L) ? 0 :
+                (sum.getWorkingDuration() <= 600 * 60 * 1000L) ? 10 : 20;
+        int contextSwitchPoint = (sum.getContextSwitching() > 5) ? 20 : 0;
+
+        int score = extendedWorkSessionsPoint + lackOfBreaksPoint + nightWorkPoint + todayWorkloadPoint + contextSwitchPoint;
+        String level = (score < 40) ? "Normal" : (score < 70 ? "Caution" : "High");
+        RecoveryRecommendationType recType = mapRiskLevelToRecovery(level);
+
+        return BurnoutStatusDailyResponse.builder()
+                .userId(userId)
+                .day(workingHistory.getDay())
+                .userEmail(user.getEmail())
+                .burnoutScore(score)
+                .riskLevel(level)
+                .recommendationMessage(recType.getMessage())
+                .extendedWorkSessions(extendedWorkSessionsPoint)
+                .lackOfBreaks(lackOfBreaksPoint)
+                .nightWork(nightWorkPoint)
+                .todayWorkload(todayWorkloadPoint)
+                .frequentContextSwitching(contextSwitchPoint)
+                .build();
+    }
+
+    public List<BurnoutStatusResponse> calculateWeeklyBurnoutScore() {
+        String email = getEmailFromSecurityContext();
+        AppUser user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        String userId = user.getId();
+        List<BurnoutStatusResponse> weeklyResponses = new ArrayList<>();
+
+        for (int i = 6; i >= 0; i--) {
+            LocalDate targetDate = LocalDate.now().minusDays(i);
+            String dayString = targetDate.toString();
+
+            WorkingHistory workingHistory = workingHistoryRepository.findByUserIdAndDay(userId, dayString).orElse(null);
+
+            long workingDuration = 0;
+            long breakDuration = 0;
+            int numberOfBreaks = 0;
+            int contextSwitching = 0;
+
+            if (workingHistory != null && workingHistory.getSumarization() != null) {
+                workingDuration = workingHistory.getSumarization().getWorkingDuration();
+                breakDuration = workingHistory.getSumarization().getBreakDuration();
+                numberOfBreaks = workingHistory.getSumarization().getNumberOfBreaks();
+                contextSwitching = workingHistory.getSumarization().getContextSwitching();
+            }
+
+            int workloadPoint = (workingDuration <= 480 * 60 * 1000L) ? 0 :
+                    (workingDuration <= 600 * 60 * 1000L) ? 10 : 20;
+
+            int nightWorkPoint = 0;
+
+            int contextSwitchPoint = (contextSwitching > 5) ? 20 : 0;
+            int breakPoint = (breakDuration < 30 * 60 * 1000L) ? 20 : 0;
+
+            int score = workloadPoint + breakPoint + nightWorkPoint + contextSwitchPoint;
+            score = Math.min(score, 100);
+
+            String level = (score < 40) ? "Normal" : (score < 70 ? "Caution" : "High");
+            RecoveryRecommendationType recType = mapRiskLevelToRecovery(level);
+
+            BurnoutStatusResponse response = BurnoutStatusResponse.builder()
+                    .userId(userId)
+                    .userEmail(user.getEmail())
+                    .day(dayString)
+                    .burnoutScore(score)
+                    .riskLevel(level)
+                    .recommendationMessage(recType.getMessage())
+                    .build();
+
+            weeklyResponses.add(response);
+        }
+
+        return weeklyResponses;
+    }
+
+
+    public BurnoutStatusDailyResponse calculateDailyBurnoutByTime() {
         String email = getEmailFromSecurityContext();
         AppUser user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
@@ -80,7 +181,7 @@ public class BurnoutCalculatorService {
                 .build();
     }
 
-    public List<BurnoutStatusResponse> calculateWeeklyBurnoutScore() {
+    public List<BurnoutStatusResponse> calculateWeeklyBurnoutByTime() {
         String email = getEmailFromSecurityContext();
         AppUser user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
@@ -130,7 +231,7 @@ public class BurnoutCalculatorService {
             BurnoutStatusResponse response = BurnoutStatusResponse.builder()
                     .userId(userId)
                     .userEmail(user.getEmail())
-                    .date(targetDate)
+                    .day(targetDate.toString())
                     .burnoutScore(score)
                     .riskLevel(level)
                     .recommendationMessage(recType.getMessage())
@@ -159,87 +260,102 @@ public class BurnoutCalculatorService {
         String email = getEmailFromSecurityContext();
         AppUser user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
         String userId = user.getId();
+        String today = LocalDate.now().toString();
 
-        LocalDateTime now = LocalDateTime.now();
-        List<TaskStatus> mockTasks = List.of(
-                TaskStatus.builder()
-                        .userId(userId)
-                        .startTime(now.minusHours(5))
-                        .endTime(now.minusHours(2))
-                        .status("DONE")
-                        .isBreak(false)
-                        .build(),
-                TaskStatus.builder()
-                        .userId(userId)
-                        .startTime(now.minusHours(1))
-                        .endTime(now)
-                        .status("IN_PROGRESS")
-                        .isBreak(false)
-                        .build(),
-                TaskStatus.builder()
-                        .userId(userId)
-                        .startTime(now.minusMinutes(45))
-                        .endTime(now.minusMinutes(15))
-                        .status("DONE")
-                        .isBreak(true)
-                        .build(),
-                TaskStatus.builder()
-                        .userId(userId)
-                        .startTime(now.withHour(21))
-                        .endTime(now.withHour(22))
-                        .status("DONE")
-                        .isBreak(false)
-                        .build()
-        );
+        WorkingHistory workingHistory = new WorkingHistory();
+        workingHistory.setUserId(userId);
+        workingHistory.setDay(today);
+        workingHistory.setWorking(false);
+        workingHistory.setTaskChangedHistory(new ArrayList<>());
+        workingHistory.setWorkTimeHistory(new ArrayList<>());
 
-        taskStatusRepository.saveAll(mockTasks);
+        SumarizationDto sum = new SumarizationDto();
+        sum.setWorkingDuration(3 * 60 * 60 * 1000L);
+        sum.setBreakDuration(30 * 60 * 1000L);
+        sum.setContextSwitching(6);
+        sum.setNumberOfBreaks(1);
+
+        workingHistory.setSumarization(sum);
+
+        workingHistoryRepository.save(workingHistory);
     }
 
     public void createMockWeeklyTasks() {
         String email = getEmailFromSecurityContext();
         AppUser user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
         String userId = user.getId();
 
-        LocalDate today = LocalDate.now();
-        LocalDate monday = today.with(DayOfWeek.MONDAY);
+        LocalDate baseDate = LocalDate.of(2025, 7, 24);
+        LocalDate monday = baseDate.with(DayOfWeek.MONDAY);
 
-        List<TaskStatus> weeklyTasks = new ArrayList<>();
+        List<WorkingHistory> weeklyMockHistories = new ArrayList<>();
 
         for (int i = 0; i < 7; i++) {
             LocalDate workDay = monday.plusDays(i);
-            LocalDateTime startTime = workDay.atTime(9, 0);
-            LocalDateTime endTime = workDay.atTime(18, 0);
 
-            weeklyTasks.add(TaskStatus.builder()
-                    .userId(userId)
-                    .startTime(startTime)
-                    .endTime(endTime)
-                    .status("DONE")
-                    .isBreak(false)
-                    .build());
+            WorkingHistory wh = new WorkingHistory();
+            wh.setUserId(userId);
+            wh.setDay(workDay.toString());
+            wh.setWorking(false);
+            wh.setTaskChangedHistory(new ArrayList<>());
+            wh.setWorkTimeHistory(new ArrayList<>());
 
-            weeklyTasks.add(TaskStatus.builder()
-                    .userId(userId)
-                    .startTime(workDay.atTime(12, 0))
-                    .endTime(workDay.atTime(12, 30))
-                    .status("DONE")
-                    .isBreak(true)
-                    .build());
+            SumarizationDto sum = new SumarizationDto();
 
-            // context switching
-            weeklyTasks.add(TaskStatus.builder()
-                    .userId(userId)
-                    .startTime(workDay.atTime(15, 0))
-                    .endTime(workDay.atTime(16, 0))
-                    .status("IN_PROGRESS")
-                    .isBreak(false)
-                    .build());
+            switch (i) {
+                case 0 -> {
+                    sum.setWorkingDuration(14 * 60 * 60 * 1000L);
+                    sum.setBreakDuration(10 * 60 * 1000L);
+                    sum.setNumberOfBreaks(0);
+                    sum.setContextSwitching(10);
+                }
+                case 1 -> {
+                    sum.setWorkingDuration(10 * 60 * 60 * 1000L);
+                    sum.setBreakDuration(20 * 60 * 1000L);
+                    sum.setNumberOfBreaks(1);
+                    sum.setContextSwitching(15);
+                }
+                case 2 -> {
+                    sum.setWorkingDuration(6 * 60 * 60 * 1000L);
+                    sum.setBreakDuration(15 * 60 * 1000L);
+                    sum.setNumberOfBreaks(0);
+                    sum.setContextSwitching(30);
+                }
+                case 3 -> {
+                    sum.setWorkingDuration(0);
+                    sum.setBreakDuration(3 * 60 * 60 * 1000L);
+                    sum.setNumberOfBreaks(3);
+                    sum.setContextSwitching(0);
+                }
+                case 4 -> {
+                    sum.setWorkingDuration(8 * 60 * 60 * 1000L);
+                    sum.setBreakDuration(30 * 60 * 1000L);
+                    sum.setNumberOfBreaks(2);
+                    sum.setContextSwitching(3);
+                }
+                case 5 -> {
+                    sum.setWorkingDuration(9 * 60 * 60 * 1000L);
+                    sum.setBreakDuration(0);
+                    sum.setNumberOfBreaks(0);
+                    sum.setContextSwitching(6);
+                }
+                case 6 -> {
+                    sum.setWorkingDuration(0);
+                    sum.setBreakDuration(0);
+                    sum.setNumberOfBreaks(0);
+                    sum.setContextSwitching(0);
+                }
+            }
+
+            wh.setSumarization(sum);
+            weeklyMockHistories.add(wh);
         }
 
-        taskStatusRepository.saveAll(weeklyTasks);
+        workingHistoryRepository.saveAll(weeklyMockHistories);
     }
-
 
 }
