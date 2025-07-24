@@ -54,6 +54,10 @@ public class ProfileService {
         }
 
         user.updateFromRequest(request);
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+
         userRepository.save(user);
 
         return ProfileResponse.builder()
