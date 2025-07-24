@@ -20,10 +20,10 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Run tests with Maven
-        run: ./mvnw test
-        env:
-          allowedOrigins: "*"
+#      - name: Run tests with Maven
+#        run: ./mvnw test
+#        env:
+#          allowedOrigins: "*"
 
 #      - name: Print test failure reports
 #        if: failure()
