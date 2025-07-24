@@ -34,33 +34,46 @@ public class BurnoutCalculatorService {
     private final MailService mailService;
 
     public BurnoutStatusDailyResponse calculateDailyBurnoutScore(AppUser user) {
-
         String userId = user.getId();
-        String today = LocalDate.now().toString();
 
-        WorkingHistory workingHistory = workingHistoryRepository.findByUserIdAndDay(userId, today)
+        LocalDate today = LocalDate.now(ZoneId.of("Europe/Paris"));
+
+        WorkingHistory workingHistory = workingHistoryRepository.findByUserIdAndDay(userId, today.toString())
                 .orElse(null);
 
         if (workingHistory == null || workingHistory.getSumarization() == null) {
-            return null;
+            return BurnoutStatusDailyResponse.builder()
+                    .userId(userId)
+                    .day(today.toString())
+                    .userEmail(user.getEmail())
+                    .burnoutScore(0)
+                    .riskLevel("Normal")
+                    .recommendationMessage("No data for today.")
+                    .extendedWorkSessions(0)
+                    .lackOfBreaks(0)
+                    .nightWork(0)
+                    .todayWorkload(0)
+                    .frequentContextSwitching(0)
+                    .build();
         }
 
         var sum = workingHistory.getSumarization();
 
-        int extendedWorkSessionsPoint = (sum.getWorkingDuration() >= 3 * 60 * 60 * 1000L) ? 20 : 0;
-        int lackOfBreaksPoint = (sum.getNumberOfBreaks() == 0) ? 20 : (sum.getNumberOfBreaks() == 1 ? 10 : 0);
-        int nightWorkPoint = 0;
-        int todayWorkloadPoint = (sum.getWorkingDuration() <= 480 * 60 * 1000L) ? 0 :
-                (sum.getWorkingDuration() <= 600 * 60 * 1000L) ? 10 : 20;
-        int contextSwitchPoint = (sum.getContextSwitching() > 5) ? 20 : 0;
+        int extendedWorkSessionsPoint = sum.getWorkingDuration() >= 1 * 60 * 60 * 1000L ? 10 : 0;
+        int lackOfBreaksPoint = sum.getNumberOfBreaks() < 3 ? 10 : 0;
+        int nightWorkPoint = 0; // 미구현
+        int todayWorkloadPoint = sum.getWorkingDuration() >= 2 * 60 * 60 * 1000L ? 10 : 0;
+        int contextSwitchPoint = sum.getContextSwitching() >= 1 ? 10 : 0;
 
         int score = extendedWorkSessionsPoint + lackOfBreaksPoint + nightWorkPoint + todayWorkloadPoint + contextSwitchPoint;
-        String level = (score < 40) ? "Normal" : (score < 70 ? "Caution" : "High");
+        score = Math.min(score, 100);
+
+        String level = score < 40 ? "Normal" : (score < 70 ? "Caution" : "High");
         RecoveryRecommendationType recType = mapRiskLevelToRecovery(level);
 
         return BurnoutStatusDailyResponse.builder()
                 .userId(userId)
-                .day(workingHistory.getDay())
+                .day(today.toString())
                 .userEmail(user.getEmail())
                 .burnoutScore(score)
                 .riskLevel(level)
@@ -72,6 +85,7 @@ public class BurnoutCalculatorService {
                 .frequentContextSwitching(contextSwitchPoint)
                 .build();
     }
+
 
     public List<BurnoutStatusResponse> calculateWeeklyBurnoutScore() {
         String email = getEmailFromSecurityContext();
@@ -328,8 +342,8 @@ public class BurnoutCalculatorService {
                     sum.setContextSwitching(30);
                 }
                 case 3 -> {
-                    sum.setWorkingDuration(0);
-                    sum.setBreakDuration(3 * 60 * 60 * 1000L);
+                    sum.setWorkingDuration(6 * 60 * 60 * 1000L);
+                    sum.setBreakDuration(15 * 60 * 1000L);
                     sum.setNumberOfBreaks(3);
                     sum.setContextSwitching(0);
                 }
@@ -346,8 +360,8 @@ public class BurnoutCalculatorService {
                     sum.setContextSwitching(6);
                 }
                 case 6 -> {
-                    sum.setWorkingDuration(0);
-                    sum.setBreakDuration(0);
+                    sum.setWorkingDuration(6 * 60 * 60 * 1000L);
+                    sum.setBreakDuration(15 * 60 * 1000L);
                     sum.setNumberOfBreaks(0);
                     sum.setContextSwitching(0);
                 }

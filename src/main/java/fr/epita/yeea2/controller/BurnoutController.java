@@ -21,24 +21,6 @@ public class BurnoutController {
     private final BurnoutCalculatorService burnoutCalculatorService;
     private final UserRepository userRepository;
 
-//    @GetMapping("/daily-status")
-//    public ResponseEntity<ApiResponse<BurnoutStatusDailyResponse>> getDailyBurnoutStatus() {
-//        BurnoutStatusDailyResponse status = burnoutCalculatorService.calculateDailyBurnoutScore();
-//        return ResponseEntity.ok(new ApiResponse<>(200, "Daily burnout", status));
-//    }
-//
-//    @GetMapping("/weekly-status")
-//    public ResponseEntity<ApiResponse<List<BurnoutStatusResponse>>> getWeeklyBurnoutStatus() {
-//        List<BurnoutStatusResponse> status = burnoutCalculatorService.calculateWeeklyBurnoutScore();
-//        return ResponseEntity.ok(new ApiResponse<>(200, "Weekly burnout", status));
-//    }
-//
-//    @PostMapping("/mock-task")
-//    public ResponseEntity<String> createMockTask() {
-//        burnoutCalculatorService.createMockWeeklyTasks();
-//        return ResponseEntity.ok("Mock tasks created.");
-//    }
-
     @GetMapping("/daily-status")
     public ResponseEntity<ApiResponse<BurnoutStatusDailyResponse>> getDailyBurnoutStatus() {
         try {
