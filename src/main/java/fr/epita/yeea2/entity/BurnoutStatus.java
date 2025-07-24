@@ -1,5 +1,6 @@
 package fr.epita.yeea2.entity;
 
+import fr.epita.yeea2.constant.RecoveryRecommendationType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
