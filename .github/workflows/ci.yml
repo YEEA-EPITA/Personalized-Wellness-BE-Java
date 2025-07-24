@@ -2,9 +2,9 @@ name: Java CI with Maven and Docker
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "staging" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "staging" ]
 
 jobs:
   build-and-dockerize:
