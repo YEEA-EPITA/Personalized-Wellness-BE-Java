@@ -12,6 +12,7 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
   main:
+    web-application-type: none
     allow-bean-definition-overriding: true
   security:
     oauth2:
