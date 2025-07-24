@@ -1,4 +1,4 @@
-package fr.epita.yeea2.entity;
+package fr.epita.yeea2.constant;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

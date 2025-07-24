@@ -16,7 +16,7 @@ import java.util.Date;
 import java.util.List;
 
 @Service
-public class BurnOutService {
+public class WorkingHistoryService {
     @Autowired
     private WorkingHistoryRepository workingHistoryRepository;
 

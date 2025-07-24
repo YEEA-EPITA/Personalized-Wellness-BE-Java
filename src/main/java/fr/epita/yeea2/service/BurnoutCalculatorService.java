@@ -1,17 +1,21 @@
 package fr.epita.yeea2.service;
 
+import fr.epita.yeea2.constant.EmailConstant;
 import fr.epita.yeea2.dto.BurnoutStatusDailyResponse;
 import fr.epita.yeea2.dto.BurnoutStatusResponse;
 import fr.epita.yeea2.dto.SumarizationDto;
 import fr.epita.yeea2.entity.AppUser;
-import fr.epita.yeea2.entity.RecoveryRecommendationType;
+import fr.epita.yeea2.constant.RecoveryRecommendationType;
 import fr.epita.yeea2.entity.TaskStatus;
 import fr.epita.yeea2.entity.WorkingHistory;
 import fr.epita.yeea2.repository.TaskStatusRepository;
 import fr.epita.yeea2.repository.UserRepository;
 import fr.epita.yeea2.repository.WorkingHistoryRepository;
+import jakarta.annotation.PostConstruct;
+import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -27,20 +31,18 @@ public class BurnoutCalculatorService {
     private final UserRepository userRepository;
     private final TaskStatusRepository taskStatusRepository;
     private final WorkingHistoryRepository workingHistoryRepository;
+    private final MailService mailService;
 
-    public BurnoutStatusDailyResponse calculateDailyBurnoutScore() {
-        String email = getEmailFromSecurityContext();
-        AppUser user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    public BurnoutStatusDailyResponse calculateDailyBurnoutScore(AppUser user) {
 
         String userId = user.getId();
         String today = LocalDate.now().toString();
 
         WorkingHistory workingHistory = workingHistoryRepository.findByUserIdAndDay(userId, today)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No working history for today"));
+                .orElse(null);
 
         if (workingHistory == null || workingHistory.getSumarization() == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No working history for today");
+            return null;
         }
 
         var sum = workingHistory.getSumarization();
@@ -251,7 +253,7 @@ public class BurnoutCalculatorService {
         };
     }
 
-    private String getEmailFromSecurityContext() {
+    public String getEmailFromSecurityContext() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication.getName();
     }
@@ -358,4 +360,41 @@ public class BurnoutCalculatorService {
         workingHistoryRepository.saveAll(weeklyMockHistories);
     }
 
+    //Cron Job running daily
+//    @Scheduled(cron = "${scheduler.daily-task.cron}")
+//    @PostConstruct
+    public void runDailyTask() {
+        System.out.println("⏰ Running daily task at 23:59...");
+        try {
+        List<AppUser> users = userRepository.findAll();
+        users.forEach(user -> {
+            BurnoutStatusDailyResponse dataResponse = this.calculateDailyBurnoutScore(user);
+            if (dataResponse != null) {
+                String htmlBody = String.format(
+                        EmailConstant.htmlEmailTemplate,
+                        dataResponse.getDay(),
+                        user.getFirstName(),
+                        dataResponse.getBurnoutScore(),
+                        dataResponse.getRiskLevel(),
+                        dataResponse.getRecommendationMessage(),
+                        dataResponse.getExtendedWorkSessions(),
+                        dataResponse.getLackOfBreaks(),
+                        dataResponse.getNightWork(),
+                        dataResponse.getTodayWorkload(),
+                        dataResponse.getFrequentContextSwitching()
+                );
+
+                try {
+                    mailService.sendSimpleEmail(user.getEmail(), EmailConstant.SYSTEM_NAME, htmlBody);
+                } catch (MessagingException e) {
+                   e.printStackTrace();
+                }
+
+            }
+        });
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
+//                    throw new RuntimeException(e);
+        }
+    }
 }

@@ -33,7 +33,7 @@ class ProfileTest {
 
     @BeforeEach
     void setUp() {
-        userRepository.deleteAll();
+//        userRepository.deleteAll();
 
         AppUser user = AppUser.builder()
                 .email(email)
@@ -48,7 +48,7 @@ class ProfileTest {
 
     @AfterEach
     void tearDown() {
-        userRepository.deleteAll();
+//        userRepository.deleteAll();
     }
 
     @Test

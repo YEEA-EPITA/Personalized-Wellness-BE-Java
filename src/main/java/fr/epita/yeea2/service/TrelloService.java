@@ -47,7 +47,7 @@ public class TrelloService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final JwtService jwtService;
     private final PlatformCredentialRepository platformCredentialRepository;
-    private final BurnOutService burnOutService;
+    private final WorkingHistoryService workingHistoryService;
 
     @PostConstruct
     public void init() {
@@ -477,7 +477,7 @@ public List<TrelloCardResponse> getCardsFromListIds(TrelloListOrCardGetRequest r
             if (!response.isSuccessful()) {
                 throw new RuntimeException("Failed to update card: " + response.getMessage());
             }
-            burnOutService.changeTaskStatus(request.getCardId(),request.getListId(), PlatformConstant.TRELLO, userId);
+            workingHistoryService.changeTaskStatus(request.getCardId(),request.getListId(), PlatformConstant.TRELLO, userId);
             return objectMapper.readValue(response.getBody(), Map.class);
         } catch (Exception e) {
             throw new RuntimeException("Update card failed", e);

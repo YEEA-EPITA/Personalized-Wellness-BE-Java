@@ -1,9 +1,12 @@
 package fr.epita.yeea2.service;
 
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -51,7 +54,7 @@ public class MailService {
 
 
 //    @Scheduled(fixedRate = 30000)  // 30 secs
-    public void sendSimpleEmail() {
+    public void sendSimpleEmail(String toEmail, String subject, String text) throws MessagingException {
 
         // Mail configuration
         JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
@@ -72,11 +75,18 @@ public class MailService {
 
         // Send email notifications
 
-        SimpleMailMessage message = new SimpleMailMessage();
+//        SimpleMailMessage message = new SimpleMailMessage();
+//        message.setTo(toEmail);
+//        message.setSubject(subject);
+
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
         message.setFrom("ag-epita@zohomail.eu"); // Use your Zoho email address
-        message.setTo("gianglibra1710@gmail.com");
-        message.setSubject("[Todo by AG] Task Notification");
-        message.setText("Check this out");
+        helper.setTo(toEmail);
+        helper.setSubject(subject);
+        helper.setText(text, true);
+
+//        message.setText(text,true);
         mailSender.send(message);
 
     }

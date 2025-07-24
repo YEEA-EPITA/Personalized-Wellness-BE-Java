@@ -128,8 +128,8 @@ class BurnoutCalculationServiceTest {
     @AfterEach
     void clearSecurityContext() {
         SecurityContextHolder.clearContext();
-        taskStatusRepository.deleteAll();
-        workingHistoryRepository.deleteAll();
+//        taskStatusRepository.deleteAll();
+//        workingHistoryRepository.deleteAll();
     }
 
     @Test
@@ -155,7 +155,7 @@ class BurnoutCalculationServiceTest {
         workingHistoryRepository.save(wh);
 
         // When
-        BurnoutStatusDailyResponse result = burnoutCalculatorService.calculateDailyBurnoutScore();
+        BurnoutStatusDailyResponse result = burnoutCalculatorService.calculateDailyBurnoutScore(user);
 
         // Then
         assertThat(result.getBurnoutScore()).isGreaterThanOrEqualTo(0);

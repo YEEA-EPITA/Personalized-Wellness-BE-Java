@@ -46,7 +46,7 @@ public class SecurityConfig {
                                 .requestMatchers("/trello/login", "/trello/callback").permitAll()
 //                        .requestMatchers("/jira/projects").permitAll() // for testing
 //                        .requestMatchers("/jira/**").authenticated()  // secure the rest of /jira/**
-                        .requestMatchers("/api/burnout/**").authenticated()
+//                        .requestMatchers("/api/burnout/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2

@@ -3,7 +3,7 @@ package fr.epita.yeea2.controller;
 import fr.epita.yeea2.dto.ApiResponse;
 import fr.epita.yeea2.entity.Task;
 import fr.epita.yeea2.entity.WorkingHistory;
-import fr.epita.yeea2.service.BurnOutService;
+import fr.epita.yeea2.service.WorkingHistoryService;
 import fr.epita.yeea2.service.JwtService;
 import fr.epita.yeea2.service.TaskService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,7 +21,7 @@ public class TaskController {
 
     private final TaskService taskService;
     private final JwtService jwtService;
-    private final BurnOutService burnOutService;
+    private final WorkingHistoryService workingHistoryService;
 
     @GetMapping("/changeWorkingStatus")
     public ResponseEntity<ApiResponse> changeWorkingStatus(HttpServletRequest request){
@@ -37,7 +37,7 @@ public class TaskController {
 
         String token = authHeader.substring(7);
         String userId = jwtService.extractUserId(token);
-        WorkingHistory workingHistory = burnOutService.changeWorkingHistory(userId);
+        WorkingHistory workingHistory = workingHistoryService.changeWorkingHistory(userId);
         return ResponseEntity.ok(new ApiResponse<>(200, "Working status changed successfully", workingHistory));
     }
 
