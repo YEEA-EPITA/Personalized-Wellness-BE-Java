@@ -129,7 +129,7 @@ public class TrelloService {
                 .accessTokenSecret(accessToken.getTokenSecret())
                 .build();
 
-        return platformCredentialRepository.findByPlatformEmailAndTypeAndConnectorId(trelloEmail, PlatformConstant.TRELLO, userId)
+        return platformCredentialRepository.findByPlatformEmailAndTypeAndConnectorId(trelloEmail, PlatformConstant.TRELLO, new ObjectId(userId))
                 .map(existing -> {
                     existing.setTokens(token);
                     existing.setUpdatedAt(Instant.now());

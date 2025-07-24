@@ -71,16 +71,22 @@ public class BurnOutService {
     public void changeTaskStatus(String issueOrCardKey, String newStatus, String platform, String userId) {
         String today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
         WorkingHistory workingHistory = workingHistoryRepository.findByUserIdAndDay(userId, today).orElse(null);
+        Instant now = Instant.now();
         TaskChangedDto taskChangedDto = TaskChangedDto.builder()
                 .taskKey(issueOrCardKey)
                 .updatedStatus(newStatus)
                 .platform(platform)
-                .updatedAt(new Date().toInstant())
+                .updatedAt(now)
                 .build();
         if (workingHistory != null) {
             List<TaskChangedDto> taskChangedHistory = workingHistory.getTaskChangedHistory();
+            if (!taskChangedHistory.isEmpty()) {
+                //check if the status change for task is less than 15mins to add to context switching
+                if (now.toEpochMilli()-taskChangedHistory.get(taskChangedHistory.size()-1).getUpdatedAt().toEpochMilli()<15*60*1000) {
+                    workingHistory.getSumarization().setContextSwitching(workingHistory.getSumarization().getContextSwitching() + 1);
+                }
+            }
             taskChangedHistory.add(taskChangedDto);
-            workingHistory.getSumarization().setContextSwitching(workingHistory.getSumarization().getContextSwitching()+1);
         } else {
             workingHistory = new WorkingHistory();
             List<TaskChangedDto> taskChangedHistory = new ArrayList<>();
