@@ -46,7 +46,7 @@ class ProfileTest {
 
     @AfterEach
     void tearDown() {
-        userRepository.deleteAll();
+//        userRepository.deleteAll();
     }
 
     @Test
