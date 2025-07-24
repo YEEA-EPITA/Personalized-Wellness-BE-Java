@@ -87,13 +87,13 @@ public class BurnoutCalculatorService {
     }
 
 
-    public List<BurnoutStatusResponse> calculateWeeklyBurnoutScore() {
+    public List<BurnoutStatusDailyResponse> calculateWeeklyBurnoutScore() {
         String email = getEmailFromSecurityContext();
         AppUser user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         String userId = user.getId();
-        List<BurnoutStatusResponse> weeklyResponses = new ArrayList<>();
+        List<BurnoutStatusDailyResponse> weeklyResponses = new ArrayList<>();
 
         for (int i = 6; i >= 0; i--) {
             LocalDate targetDate = LocalDate.now().minusDays(i);
@@ -127,13 +127,17 @@ public class BurnoutCalculatorService {
             String level = (score < 40) ? "Normal" : (score < 70 ? "Caution" : "High");
             RecoveryRecommendationType recType = mapRiskLevelToRecovery(level);
 
-            BurnoutStatusResponse response = BurnoutStatusResponse.builder()
+            BurnoutStatusDailyResponse response = BurnoutStatusDailyResponse.builder()
                     .userId(userId)
                     .userEmail(user.getEmail())
-                    .day(dayString)
                     .burnoutScore(score)
                     .riskLevel(level)
                     .recommendationMessage(recType.getMessage())
+                    .extendedWorkSessions(workloadPoint)
+                    .lackOfBreaks(breakPoint)
+                    .nightWork(nightWorkPoint)
+                    .todayWorkload(workloadPoint)
+                    .frequentContextSwitching(contextSwitchPoint)
                     .build();
 
             weeklyResponses.add(response);

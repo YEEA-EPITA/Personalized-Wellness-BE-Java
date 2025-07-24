@@ -43,9 +43,9 @@ public class BurnoutController {
     }
 
     @GetMapping("/weekly-status")
-    public ResponseEntity<ApiResponse<List<BurnoutStatusResponse>>> getWeeklyBurnoutStatus() {
+    public ResponseEntity<ApiResponse<List<BurnoutStatusDailyResponse>>> getWeeklyBurnoutStatus() {
         try {
-            List<BurnoutStatusResponse> status = burnoutCalculatorService.calculateWeeklyBurnoutScore();
+            List<BurnoutStatusDailyResponse> status = burnoutCalculatorService.calculateWeeklyBurnoutScore();
 
             if (status == null || status.isEmpty()) {
                 return ResponseEntity.ok(new ApiResponse<>(204, "No working history for this week", List.of()));
