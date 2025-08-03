@@ -66,7 +66,7 @@ class ProfileTest {
                 .email("newuser@example.com")
                 .firstName("Updated")
                 .lastName("User")
-                .password(password) // 올바른 비밀번호
+                .password(password)
                 .build();
 
         mockMvc.perform(put(BASE_URL)
@@ -79,7 +79,6 @@ class ProfileTest {
     @Test
     @WithMockUser(username = "testuser@example.com", roles = "USER")
     void updateUserProfile_shouldFail_whenEmailAlreadyExists() throws Exception {
-        // 중복 이메일 등록
         userRepository.save(AppUser.builder()
                 .email("existing@example.com")
                 .password(passwordEncoder.encode("another"))
