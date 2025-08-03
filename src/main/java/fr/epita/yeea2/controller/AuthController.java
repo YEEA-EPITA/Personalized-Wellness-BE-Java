@@ -42,7 +42,7 @@ public class AuthController {
 
     @GetMapping("/")
     public String home() {
-        return "Welcome!";
+        return "Personalized Wellness Planner";
     }
 
     @GetMapping("/api/profile")
