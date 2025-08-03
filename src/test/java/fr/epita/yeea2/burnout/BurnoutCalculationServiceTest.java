@@ -33,7 +33,6 @@ import java.util.List;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class BurnoutCalculationServiceTest {
-
     @Autowired
     private BurnoutCalculatorService burnoutCalculatorService;
 

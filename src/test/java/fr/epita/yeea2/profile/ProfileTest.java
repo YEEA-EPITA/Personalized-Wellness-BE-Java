@@ -66,7 +66,7 @@ class ProfileTest {
                 .email("newuser@example.com")
                 .firstName("Updated")
                 .lastName("User")
-                .password(password) // 올바른 비밀번호
+                .password(password)
                 .build();
 
         mockMvc.perform(put(BASE_URL)
@@ -133,3 +133,4 @@ class ProfileTest {
     }
 
 }
+
