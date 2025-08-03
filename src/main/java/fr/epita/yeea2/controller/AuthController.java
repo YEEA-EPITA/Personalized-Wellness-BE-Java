@@ -7,6 +7,7 @@ import fr.epita.yeea2.entity.AppUser;
 import fr.epita.yeea2.repository.UserRepository;
 import fr.epita.yeea2.service.AppUserDetailsService;
 import fr.epita.yeea2.service.JwtService;
+import fr.epita.yeea2.service.MailService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -36,6 +37,7 @@ public class AuthController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AppUserDetailsService appUserDetailsService;
+    private final MailService mailService;
 
 
     @GetMapping("/")
@@ -89,6 +91,7 @@ public class AuthController {
             UserResponse userResponse = UserResponse.from(user, jwt);
 
             ApiResponse<UserResponse> response = new ApiResponse<>(200, "Login successful", userResponse);
+//            mailService.sendSimpleEmail();
             return ResponseEntity.ok(response);
         } catch (AuthenticationException ex) {
             return ResponseEntity

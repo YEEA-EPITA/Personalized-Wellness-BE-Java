@@ -1,17 +1,21 @@
 package fr.epita.yeea2.service;
 
+import fr.epita.yeea2.constant.EmailConstant;
 import fr.epita.yeea2.dto.BurnoutStatusDailyResponse;
 import fr.epita.yeea2.dto.BurnoutStatusResponse;
 import fr.epita.yeea2.dto.SumarizationDto;
 import fr.epita.yeea2.entity.AppUser;
-import fr.epita.yeea2.entity.RecoveryRecommendationType;
+import fr.epita.yeea2.constant.RecoveryRecommendationType;
 import fr.epita.yeea2.entity.TaskStatus;
 import fr.epita.yeea2.entity.WorkingHistory;
 import fr.epita.yeea2.repository.TaskStatusRepository;
 import fr.epita.yeea2.repository.UserRepository;
 import fr.epita.yeea2.repository.WorkingHistoryRepository;
+import jakarta.annotation.PostConstruct;
+import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -27,38 +31,49 @@ public class BurnoutCalculatorService {
     private final UserRepository userRepository;
     private final TaskStatusRepository taskStatusRepository;
     private final WorkingHistoryRepository workingHistoryRepository;
+    private final MailService mailService;
 
-    public BurnoutStatusDailyResponse calculateDailyBurnoutScore() {
-        String email = getEmailFromSecurityContext();
-        AppUser user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-
+    public BurnoutStatusDailyResponse calculateDailyBurnoutScore(AppUser user) {
         String userId = user.getId();
-        String today = LocalDate.now().toString();
 
-        WorkingHistory workingHistory = workingHistoryRepository.findByUserIdAndDay(userId, today)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No working history for today"));
+        LocalDate today = LocalDate.now(ZoneId.of("Europe/Paris"));
+
+        WorkingHistory workingHistory = workingHistoryRepository.findByUserIdAndDay(userId, today.toString())
+                .orElse(null);
 
         if (workingHistory == null || workingHistory.getSumarization() == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No working history for today");
+            return BurnoutStatusDailyResponse.builder()
+                    .userId(userId)
+                    .day(today.toString())
+                    .userEmail(user.getEmail())
+                    .burnoutScore(0)
+                    .riskLevel("Normal")
+                    .recommendationMessage("No data for today.")
+                    .extendedWorkSessions(0)
+                    .lackOfBreaks(0)
+                    .nightWork(0)
+                    .todayWorkload(0)
+                    .frequentContextSwitching(0)
+                    .build();
         }
 
         var sum = workingHistory.getSumarization();
 
-        int extendedWorkSessionsPoint = (sum.getWorkingDuration() >= 3 * 60 * 60 * 1000L) ? 20 : 0;
-        int lackOfBreaksPoint = (sum.getNumberOfBreaks() == 0) ? 20 : (sum.getNumberOfBreaks() == 1 ? 10 : 0);
-        int nightWorkPoint = 0;
-        int todayWorkloadPoint = (sum.getWorkingDuration() <= 480 * 60 * 1000L) ? 0 :
-                (sum.getWorkingDuration() <= 600 * 60 * 1000L) ? 10 : 20;
-        int contextSwitchPoint = (sum.getContextSwitching() > 5) ? 20 : 0;
+        int extendedWorkSessionsPoint = sum.getWorkingDuration() >= 1 * 60 * 60 * 1000L ? 10 : 0;
+        int lackOfBreaksPoint = sum.getNumberOfBreaks() < 3 ? 10 : 0;
+        int nightWorkPoint = 0; // 미구현
+        int todayWorkloadPoint = sum.getWorkingDuration() >= 2 * 60 * 60 * 1000L ? 10 : 0;
+        int contextSwitchPoint = sum.getContextSwitching() >= 1 ? 10 : 0;
 
         int score = extendedWorkSessionsPoint + lackOfBreaksPoint + nightWorkPoint + todayWorkloadPoint + contextSwitchPoint;
-        String level = (score < 40) ? "Normal" : (score < 70 ? "Caution" : "High");
+        score = Math.min(score, 100);
+
+        String level = score < 40 ? "Normal" : (score < 70 ? "Caution" : "High");
         RecoveryRecommendationType recType = mapRiskLevelToRecovery(level);
 
         return BurnoutStatusDailyResponse.builder()
                 .userId(userId)
-                .day(workingHistory.getDay())
+                .day(today.toString())
                 .userEmail(user.getEmail())
                 .burnoutScore(score)
                 .riskLevel(level)
@@ -71,13 +86,14 @@ public class BurnoutCalculatorService {
                 .build();
     }
 
-    public List<BurnoutStatusResponse> calculateWeeklyBurnoutScore() {
+
+    public List<BurnoutStatusDailyResponse> calculateWeeklyBurnoutScore() {
         String email = getEmailFromSecurityContext();
         AppUser user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         String userId = user.getId();
-        List<BurnoutStatusResponse> weeklyResponses = new ArrayList<>();
+        List<BurnoutStatusDailyResponse> weeklyResponses = new ArrayList<>();
 
         for (int i = 6; i >= 0; i--) {
             LocalDate targetDate = LocalDate.now().minusDays(i);
@@ -111,13 +127,17 @@ public class BurnoutCalculatorService {
             String level = (score < 40) ? "Normal" : (score < 70 ? "Caution" : "High");
             RecoveryRecommendationType recType = mapRiskLevelToRecovery(level);
 
-            BurnoutStatusResponse response = BurnoutStatusResponse.builder()
+            BurnoutStatusDailyResponse response = BurnoutStatusDailyResponse.builder()
                     .userId(userId)
                     .userEmail(user.getEmail())
-                    .day(dayString)
                     .burnoutScore(score)
                     .riskLevel(level)
                     .recommendationMessage(recType.getMessage())
+                    .extendedWorkSessions(workloadPoint)
+                    .lackOfBreaks(breakPoint)
+                    .nightWork(nightWorkPoint)
+                    .todayWorkload(workloadPoint)
+                    .frequentContextSwitching(contextSwitchPoint)
                     .build();
 
             weeklyResponses.add(response);
@@ -251,7 +271,7 @@ public class BurnoutCalculatorService {
         };
     }
 
-    private String getEmailFromSecurityContext() {
+    public String getEmailFromSecurityContext() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication.getName();
     }
@@ -326,8 +346,8 @@ public class BurnoutCalculatorService {
                     sum.setContextSwitching(30);
                 }
                 case 3 -> {
-                    sum.setWorkingDuration(0);
-                    sum.setBreakDuration(3 * 60 * 60 * 1000L);
+                    sum.setWorkingDuration(6 * 60 * 60 * 1000L);
+                    sum.setBreakDuration(15 * 60 * 1000L);
                     sum.setNumberOfBreaks(3);
                     sum.setContextSwitching(0);
                 }
@@ -344,8 +364,8 @@ public class BurnoutCalculatorService {
                     sum.setContextSwitching(6);
                 }
                 case 6 -> {
-                    sum.setWorkingDuration(0);
-                    sum.setBreakDuration(0);
+                    sum.setWorkingDuration(6 * 60 * 60 * 1000L);
+                    sum.setBreakDuration(15 * 60 * 1000L);
                     sum.setNumberOfBreaks(0);
                     sum.setContextSwitching(0);
                 }
@@ -358,4 +378,41 @@ public class BurnoutCalculatorService {
         workingHistoryRepository.saveAll(weeklyMockHistories);
     }
 
+    //Cron Job running daily
+//    @Scheduled(cron = "${scheduler.daily-task.cron}")
+//    @PostConstruct
+    public void runDailyTask() {
+        System.out.println("⏰ Running daily task at 23:59...");
+        try {
+        List<AppUser> users = userRepository.findAll();
+        users.forEach(user -> {
+            BurnoutStatusDailyResponse dataResponse = this.calculateDailyBurnoutScore(user);
+            if (dataResponse != null) {
+                String htmlBody = String.format(
+                        EmailConstant.htmlEmailTemplate,
+                        dataResponse.getDay(),
+                        user.getFirstName(),
+                        dataResponse.getBurnoutScore(),
+                        dataResponse.getRiskLevel(),
+                        dataResponse.getRecommendationMessage(),
+                        dataResponse.getExtendedWorkSessions(),
+                        dataResponse.getLackOfBreaks(),
+                        dataResponse.getNightWork(),
+                        dataResponse.getTodayWorkload(),
+                        dataResponse.getFrequentContextSwitching()
+                );
+
+                try {
+                    mailService.sendSimpleEmail(user.getEmail(), EmailConstant.SYSTEM_NAME, htmlBody);
+                } catch (MessagingException e) {
+                   e.printStackTrace();
+                }
+
+            }
+        });
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
+//                    throw new RuntimeException(e);
+        }
+    }
 }

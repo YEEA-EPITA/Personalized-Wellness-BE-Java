@@ -47,7 +47,7 @@ public class JiraService {
     private final PlatformCredentialRepository platformCredentialRepository;
 
     private final JwtService jwtService;
-    private final BurnOutService burnOutService;
+    private final WorkingHistoryService workingHistoryService;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -541,7 +541,7 @@ public class JiraService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
         restTemplate.postForEntity(url, entity, String.class);
-        burnOutService.changeTaskStatus(issueKey, newStatus, PlatformConstant.JIRA, userId);
+        workingHistoryService.changeTaskStatus(issueKey, newStatus, PlatformConstant.JIRA, userId);
     }
 
 

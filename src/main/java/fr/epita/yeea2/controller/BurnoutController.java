@@ -3,6 +3,8 @@ package fr.epita.yeea2.controller;
 import fr.epita.yeea2.dto.ApiResponse;
 import fr.epita.yeea2.dto.BurnoutStatusDailyResponse;
 import fr.epita.yeea2.dto.BurnoutStatusResponse;
+import fr.epita.yeea2.entity.AppUser;
+import fr.epita.yeea2.repository.UserRepository;
 import fr.epita.yeea2.service.BurnoutCalculatorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -17,30 +19,20 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BurnoutController {
     private final BurnoutCalculatorService burnoutCalculatorService;
-
-//    @GetMapping("/daily-status")
-//    public ResponseEntity<ApiResponse<BurnoutStatusDailyResponse>> getDailyBurnoutStatus() {
-//        BurnoutStatusDailyResponse status = burnoutCalculatorService.calculateDailyBurnoutScore();
-//        return ResponseEntity.ok(new ApiResponse<>(200, "Daily burnout", status));
-//    }
-//
-//    @GetMapping("/weekly-status")
-//    public ResponseEntity<ApiResponse<List<BurnoutStatusResponse>>> getWeeklyBurnoutStatus() {
-//        List<BurnoutStatusResponse> status = burnoutCalculatorService.calculateWeeklyBurnoutScore();
-//        return ResponseEntity.ok(new ApiResponse<>(200, "Weekly burnout", status));
-//    }
-//
-//    @PostMapping("/mock-task")
-//    public ResponseEntity<String> createMockTask() {
-//        burnoutCalculatorService.createMockWeeklyTasks();
-//        return ResponseEntity.ok("Mock tasks created.");
-//    }
+    private final UserRepository userRepository;
 
     @GetMapping("/daily-status")
     public ResponseEntity<ApiResponse<BurnoutStatusDailyResponse>> getDailyBurnoutStatus() {
         try {
-            BurnoutStatusDailyResponse status = burnoutCalculatorService.calculateDailyBurnoutScore();
-            return ResponseEntity.ok(new ApiResponse<>(200, "Daily burnout", status));
+            String email = burnoutCalculatorService.getEmailFromSecurityContext();
+            AppUser user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+            BurnoutStatusDailyResponse status = burnoutCalculatorService.calculateDailyBurnoutScore(user);
+            if (status != null) {
+                return ResponseEntity.ok(new ApiResponse<>(200, "Daily burnout", status));
+            } else  {
+                return ResponseEntity.ok(new ApiResponse<>(200, "No working history for today", null));
+            }
         } catch (ResponseStatusException e) {
             return ResponseEntity.status(e.getStatusCode())
                     .body(new ApiResponse<>(e.getStatusCode().value(), e.getReason(), null));
@@ -51,9 +43,9 @@ public class BurnoutController {
     }
 
     @GetMapping("/weekly-status")
-    public ResponseEntity<ApiResponse<List<BurnoutStatusResponse>>> getWeeklyBurnoutStatus() {
+    public ResponseEntity<ApiResponse<List<BurnoutStatusDailyResponse>>> getWeeklyBurnoutStatus() {
         try {
-            List<BurnoutStatusResponse> status = burnoutCalculatorService.calculateWeeklyBurnoutScore();
+            List<BurnoutStatusDailyResponse> status = burnoutCalculatorService.calculateWeeklyBurnoutScore();
 
             if (status == null || status.isEmpty()) {
                 return ResponseEntity.ok(new ApiResponse<>(204, "No working history for this week", List.of()));
@@ -77,6 +69,17 @@ public class BurnoutController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ApiResponse<>(500, "Failed to create mock tasks", null));
+        }
+    }
+
+    @GetMapping("/send-email")
+    public ResponseEntity<ApiResponse<String>> sendEmail() {
+        try {
+            burnoutCalculatorService.runDailyTask();
+            return ResponseEntity.ok(new ApiResponse<>(200, "Emails sended", ""));
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<>(500, "Failed to send emails", null));
         }
     }
 }

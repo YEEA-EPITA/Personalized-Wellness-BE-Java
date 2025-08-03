@@ -7,7 +7,7 @@ import lombok.Setter;
 @Setter
 public class SumarizationDto {
     long workingDuration = 0;
-    long breakDuration = 0 ;
+    long breakDuration = 0;
     int contextSwitching = 0;
     int numberOfBreaks = 0;
 }

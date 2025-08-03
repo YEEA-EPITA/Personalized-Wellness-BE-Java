@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -62,63 +63,91 @@ class BurnoutCalculationServiceTest {
     @AfterEach
     void clearSecurityContext() {
         SecurityContextHolder.clearContext();
-        taskStatusRepository.deleteAll();
-        workingHistoryRepository.deleteAll();
+//        taskStatusRepository.deleteAll();
+//        workingHistoryRepository.deleteAll();
     }
 
     @Test
     void testCalculateDailyBurnoutScore() {
         // Given
+        LocalDate today = LocalDate.now(ZoneId.of("Europe/Paris"));
+
         AppUser user = userRepository.findByEmail("test@email.com")
                 .orElseThrow(() -> new RuntimeException("Test user not found"));
 
-        WorkingHistory wh = new WorkingHistory();
-        wh.setUserId(user.getId());
-        wh.setDay(LocalDate.now().toString());
-        wh.setWorking(false);
-        wh.setTaskChangedHistory(new ArrayList<>());
-        wh.setWorkTimeHistory(new ArrayList<>());
+        var summary = new fr.epita.yeea2.dto.SumarizationDto();
+        summary.setWorkingDuration(3 * 60 * 60 * 1000L); // 3h
+        summary.setBreakDuration(15 * 60 * 1000L);       // 15min
+        summary.setNumberOfBreaks(1);
+        summary.setContextSwitching(5);
 
-        SumarizationDto sum = new SumarizationDto();
-        sum.setWorkingDuration(3 * 60 * 60 * 1000L); // 3시간
-        sum.setBreakDuration(30 * 60 * 1000L); // 30분
-        sum.setContextSwitching(6);
-        sum.setNumberOfBreaks(1);
+        var history = new WorkingHistory();
+        history.setUserId(user.getId());
+        history.setDay(today.toString());
+        history.setWorking(true);
+        history.setSumarization(summary);
+        history.setTaskChangedHistory(new ArrayList<>());
+        history.setWorkTimeHistory(new ArrayList<>());
 
-        wh.setSumarization(sum);
-        workingHistoryRepository.save(wh);
+        workingHistoryRepository.save(history);
 
         // When
-        BurnoutStatusDailyResponse result = burnoutCalculatorService.calculateDailyBurnoutScore();
+        BurnoutStatusDailyResponse result = burnoutCalculatorService.calculateDailyBurnoutScore(user);
 
         // Then
-        assertThat(result.getBurnoutScore()).isGreaterThanOrEqualTo(0);
         assertThat(result.getUserId()).isEqualTo(user.getId());
+        assertThat(result.getUserEmail()).isEqualTo(user.getEmail());
+        assertThat(result.getBurnoutScore()).isBetween(0, 50); // expected score: 40
         assertThat(result.getRiskLevel()).isIn("Normal", "Caution", "High");
-        assertThat(result.getExtendedWorkSessions()).isIn(0, 20);
-        assertThat(result.getLackOfBreaks()).isIn(0, 10, 20);
-        assertThat(result.getNightWork()).isIn(0, 10, 20);
-        assertThat(result.getTodayWorkload()).isIn(0, 10, 20);
-        assertThat(result.getFrequentContextSwitching()).isIn(0, 20);
+        assertThat(result.getRecommendationMessage()).isNotBlank();
+        assertThat(result.getExtendedWorkSessions()).isEqualTo(10);
+        assertThat(result.getLackOfBreaks()).isEqualTo(10);
+        assertThat(result.getFrequentContextSwitching()).isEqualTo(10);
+        assertThat(result.getTodayWorkload()).isEqualTo(10);
+        assertThat(result.getNightWork()).isEqualTo(0); // 미구현
     }
 
     @Test
     void testCalculateWeeklyBurnoutScore() {
-        // Given
         AppUser user = userRepository.findByEmail("test@email.com")
                 .orElseThrow(() -> new RuntimeException("Test user not found"));
 
-        burnoutCalculatorService.createMockWeeklyTasks();
+        // Given
+        for (int i = 0; i < 7; i++) {
+            LocalDate date = LocalDate.now().minusDays(i);
+
+            var summary = new fr.epita.yeea2.dto.SumarizationDto();
+            summary.setWorkingDuration(9 * 60 * 60 * 1000L); // 9h
+            summary.setBreakDuration(20 * 60 * 1000L);       // 20min
+            summary.setNumberOfBreaks(2);
+            summary.setContextSwitching(6);
+
+            var history = new WorkingHistory();
+            history.setUserId(user.getId());
+            history.setDay(date.toString());
+            history.setWorking(true);
+            history.setSumarization(summary);
+            history.setTaskChangedHistory(new ArrayList<>());
+            history.setWorkTimeHistory(new ArrayList<>());
+
+            workingHistoryRepository.save(history);
+        }
 
         // When
-        List<BurnoutStatusResponse> results = burnoutCalculatorService.calculateWeeklyBurnoutScore();
+        List<BurnoutStatusDailyResponse> resultList = burnoutCalculatorService.calculateWeeklyBurnoutScore();
 
         // Then
-        assertThat(results).hasSize(7);
-        for (BurnoutStatusResponse result : results) {
+        assertThat(resultList).hasSize(7);
+        for (BurnoutStatusDailyResponse result : resultList) {
             assertThat(result.getUserId()).isEqualTo(user.getId());
+            assertThat(result.getUserEmail()).isEqualTo(user.getEmail());
             assertThat(result.getBurnoutScore()).isBetween(0, 100);
             assertThat(result.getRiskLevel()).isIn("Normal", "Caution", "High");
+            assertThat(result.getTodayWorkload()).isIn(10, 20);
+            assertThat(result.getLackOfBreaks()).isEqualTo(20); // < 30min
+            assertThat(result.getFrequentContextSwitching()).isEqualTo(20); // > 5
+            assertThat(result.getRecommendationMessage()).isNotBlank();
         }
     }
+
 }
